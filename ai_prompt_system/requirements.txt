@@ -37,3 +37,6 @@ pyyaml>=6.0.1
 
 # Date/time utilities
 python-dateutil>=2.8.2
+
+jinja2
+pytest

@@ -390,5 +390,301 @@ def test(ctx):
         sys.exit(1)
 
 
+@cli.group()
+def engine():
+    """Rule engine operations for prompt generation and validation."""
+    pass
+
+
+@engine.command()
+@click.argument('task_rule_name')
+@click.option('--context', '-c', help='JSON context for template rendering')
+@click.option('--model', '-m', default='claude', help='Target AI model (claude, gpt, gemini)')
+@click.option('--output', '-o', help='Save prompt to file')
+@click.pass_context
+def generate(ctx, task_rule_name, context, model, output):
+    """Generate a prompt from a task rule."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Parse context if provided
+        context_dict = {}
+        if context:
+            try:
+                context_dict = json.loads(context)
+            except json.JSONDecodeError as e:
+                click.echo(f"Error: Invalid JSON context: {e}", err=True)
+                sys.exit(1)
+
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Generate prompt
+        result = engine.generate_prompt(task_rule_name, context_dict, model)
+
+        # Display result
+        click.echo(f"\n{'='*60}")
+        click.echo(f"Generated Prompt for Task: {task_rule_name}")
+        click.echo(f"Target Model: {model}")
+        click.echo(f"{'='*60}")
+        click.echo(result['prompt'])
+        click.echo(f"{'='*60}")
+
+        # Performance info
+        perf = result.get('performance', {})
+        click.echo(f"Render time: {perf.get('render_time', 0):.3f}s")
+
+        # Save to file if requested
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write(result['prompt'])
+            click.echo(f"Prompt saved to: {output}")
+
+    except Exception as e:
+        click.echo(f"Error generating prompt: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.option('--detailed', '-d', is_flag=True, help='Show detailed validation results')
+@click.pass_context
+def validate(ctx, detailed):
+    """Validate the rule system for consistency and circular dependencies."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Run validation
+        results = engine.validate_system()
+
+        # Display results
+        validation = results['validation']
+        conflicts = results['conflicts']
+
+        click.echo(f"\n{'='*50}")
+        click.echo("Rule System Validation")
+        click.echo(f"{'='*50}")
+
+        # Main validation status
+        if validation['valid']:
+            click.echo("✅ System validation: PASSED", color='green')
+        else:
+            click.echo("❌ System validation: FAILED", color='red')
+
+        # Errors
+        if validation['errors']:
+            click.echo(f"\n🚨 Errors ({len(validation['errors'])}):")
+            for error in validation['errors']:
+                click.echo(f"  - {error}")
+
+        # Warnings
+        if validation['warnings']:
+            click.echo(f"\n⚠️  Warnings ({len(validation['warnings'])}):")
+            for warning in validation['warnings']:
+                click.echo(f"  - {warning}")
+
+        # Circular dependencies
+        if validation['circular_dependencies']:
+            click.echo(f"\n🔄 Circular Dependencies ({len(validation['circular_dependencies'])}):")
+            for cycle in validation['circular_dependencies']:
+                click.echo(f"  - {' → '.join(map(str, cycle))}")
+
+        # Conflicts
+        if conflicts:
+            click.echo(f"\n⚡ Rule Conflicts ({len(conflicts)}):")
+            for conflict in conflicts:
+                if conflict.get('type') == 'duplicate_name':
+                    click.echo(f"  - Duplicate name '{conflict['name']}' in {conflict['table']} ({conflict['count']} occurrences)")
+                else:
+                    click.echo(f"  - {conflict}")
+
+        # Detailed information
+        if detailed:
+            click.echo(f"\n📊 System Statistics:")
+            system_stats = results['system']
+            for key, value in system_stats.items():
+                click.echo(f"  - {key.replace('_', ' ').title()}: {value}")
+
+            cache_stats = results['cache']
+            click.echo(f"\n🗄️  Cache Statistics:")
+            click.echo(f"  - Size: {cache_stats['size']}/{cache_stats['max_size']}")
+            click.echo(f"  - Hit Rate: {cache_stats['hit_rate']:.2%}")
+            click.echo(f"  - Hits: {cache_stats['hit_count']}, Misses: {cache_stats['miss_count']}")
+
+        # Exit with error code if validation failed
+        if not validation['valid'] or validation['errors'] or conflicts:
+            sys.exit(1)
+
+    except Exception as e:
+        click.echo(f"Error running validation: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.argument('rule_type', type=click.Choice(['task', 'semantic', 'primitive']))
+@click.argument('rule_name')
+@click.pass_context
+def dependencies(ctx, rule_type, rule_name):
+    """Show dependencies for a rule."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Get dependencies
+        deps = engine.get_rule_dependencies(rule_type, rule_name)
+
+        click.echo(f"\n📋 Dependencies for {rule_type} rule '{rule_name}':")
+        click.echo(f"{'='*60}")
+
+        if not deps:
+            click.echo("No dependencies found.")
+        else:
+            for dep in deps:
+                weight_info = f" (weight: {dep['weight']})" if dep.get('weight', 1.0) != 1.0 else ""
+                via_info = f" via {dep['via_semantic']}" if dep.get('via_semantic') else ""
+                click.echo(f"  - {dep['type']}: {dep['name']}{weight_info}{via_info}")
+
+    except Exception as e:
+        click.echo(f"Error getting dependencies: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.pass_context
+def optimize(ctx):
+    """Optimize the rule system performance."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Run optimization
+        results = engine.optimize_system()
+
+        click.echo(f"\n🔧 System Optimization Results:")
+        click.echo(f"{'='*40}")
+        click.echo(f"Cache entries cleaned: {results['cache_cleaned']}")
+        click.echo(f"Optimized at: {results['optimized_at']}")
+
+    except Exception as e:
+        click.echo(f"Error optimizing system: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.argument('filepath')
+@click.option('--rule-types', '-t', multiple=True, help='Rule types to export (primitive, semantic, task)')
+@click.option('--format', '-f', default='json', type=click.Choice(['json', 'yaml', 'sql']), help='Export format')
+@click.pass_context
+def export(ctx, filepath, rule_types, format):
+    """Export rules to file."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Convert rule_types tuple to list
+        rule_types_list = list(rule_types) if rule_types else None
+
+        # Export rules
+        results = engine.export_rules(filepath, rule_types_list, format)
+
+        click.echo(f"✅ Export completed:")
+        click.echo(f"  - File: {results['filepath']}")
+        click.echo(f"  - Format: {results['format']}")
+        click.echo(f"  - Rules exported: {results['exported_rules']}")
+
+    except Exception as e:
+        click.echo(f"Error exporting rules: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.argument('filepath')
+@click.option('--strategy', '-s', default='skip_existing',
+              type=click.Choice(['skip_existing', 'overwrite', 'create_new']),
+              help='Merge strategy for existing rules')
+@click.pass_context
+def import_rules(ctx, filepath, strategy):
+    """Import rules from file."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Import rules
+        results = engine.import_rules(filepath, strategy)
+
+        click.echo(f"✅ Import completed:")
+        click.echo(f"  - Rules imported: {results['imported_rules']}")
+        click.echo(f"  - Rules skipped: {results['skipped_rules']}")
+        click.echo(f"  - Merge strategy: {results['merge_strategy']}")
+
+    except Exception as e:
+        click.echo(f"Error importing rules: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.argument('backup_path')
+@click.pass_context
+def backup(ctx, backup_path):
+    """Create a complete system backup."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Create backup
+        results = engine.backup_system(backup_path)
+
+        click.echo(f"✅ Backup completed:")
+        click.echo(f"  - Backup file: {results['backup_path']}")
+        click.echo(f"  - Size: {results['backup_size']:,} bytes")
+        click.echo(f"  - Created: {results['backup_date']}")
+
+    except Exception as e:
+        click.echo(f"Error creating backup: {e}", err=True)
+        sys.exit(1)
+
+
+@engine.command()
+@click.argument('backup_path')
+@click.confirmation_option(prompt='This will overwrite the current database. Continue?')
+@click.pass_context
+def restore(ctx, backup_path):
+    """Restore system from backup."""
+    from src.rule_engine import RuleEngine
+
+    try:
+        # Initialize rule engine
+        engine = RuleEngine(db_manager)
+
+        # Restore from backup
+        results = engine.restore_system(backup_path)
+
+        click.echo(f"✅ Restore completed:")
+        click.echo(f"  - Restored from: {results['original_backup_date']}")
+        click.echo(f"  - Restore time: {results['restore_date']}")
+
+        # Show current statistics
+        stats = results['statistics']
+        click.echo(f"  - Current statistics:")
+        for key, value in stats.items():
+            click.echo(f"    - {key.replace('_', ' ').title()}: {value}")
+
+    except Exception as e:
+        click.echo(f"Error restoring from backup: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     cli()
