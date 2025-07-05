@@ -34,7 +34,24 @@ from pydantic import BaseModel, Field
 # Import our existing rule engine components
 import sys
 import os
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Get the absolute path to the project root
+project_root = os.environ.get('PROJECT_ROOT')
+if project_root and os.path.exists(project_root):
+    # Use environment variable if set and valid
+    project_root = os.path.abspath(project_root)
+elif os.path.basename(os.getcwd()) == 'mcp_server':
+    # If running from mcp_server directory, go up one level
+    project_root = os.path.dirname(os.getcwd())
+else:
+    # If running from project root, use current directory
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(project_root) == 'mcp_server':
+        project_root = os.path.dirname(project_root)
+
+# Change working directory to project root for proper database access
+original_cwd = os.getcwd()
+os.chdir(project_root)
 sys.path.insert(0, project_root)
 
 try:
