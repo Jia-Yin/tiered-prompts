@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "ai-prompt-engineering": {
+      "command": "python",
+      "args": [
+        "/home/jyw/Program/tiered-prompts/mcp_server/fastmcp_server.py"
+      ],
+      "env": {
+        "MCP_SERVER_ENVIRONMENT": "production",
+        "MCP_SERVER_LOG_LEVEL": "INFO",
+        "MCP_SERVER_CACHE_SIZE": "1000"
+      }
+    }
+  }
+}

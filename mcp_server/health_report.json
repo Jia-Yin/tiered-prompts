@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-07-05T22:05:37.195523",
+  "checks": {
+    "python_environment": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.556951"
+    },
+    "rule_engine": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.556974"
+    },
+    "database": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.557443"
+    },
+    "mcp_server": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.579928"
+    },
+    "configuration": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.580007"
+    },
+    "monitoring": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.580288"
+    },
+    "tools_and_resources": {
+      "status": "pass",
+      "timestamp": "2025-07-05T22:05:37.580576"
+    }
+  },
+  "overall_status": "healthy"
+}

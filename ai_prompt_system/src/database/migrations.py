@@ -269,6 +269,9 @@ class MigrationManager:
         }
 
 
+# For backward compatibility - create alias
+DatabaseMigrator = MigrationManager
+
 # Global migration manager instance
 migration_manager = MigrationManager()
 

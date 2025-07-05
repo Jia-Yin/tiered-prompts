@@ -1,0 +1,21 @@
+cache:
+  enabled: true
+  max_size: 2000
+  ttl_seconds: 7200
+database:
+  backup_enabled: true
+  path: ai_prompt_system/database/prompt_system.db
+debug: false
+environment: production
+logging:
+  file_enabled: true
+  file_path: mcp_server_production.log
+  level: INFO
+mcp:
+  enable_mock_mode: false
+  name: AI Prompt Engineering System
+  transport_type: stdio
+  version: 1.0.0
+performance:
+  enable_metrics: true
+  max_concurrent_requests: 100

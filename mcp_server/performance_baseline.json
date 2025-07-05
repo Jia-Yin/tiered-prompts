@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-07-05T22:05:37.580860",
+  "system_info": {
+    "python_version": "3.12.3 (main, Jun 18 2025, 17:59:45) [GCC 13.3.0]",
+    "platform": "linux"
+  },
+  "performance_targets": {
+    "tool_response_time_ms": 100,
+    "resource_response_time_ms": 50,
+    "success_rate_percent": 95,
+    "cache_hit_rate_percent": 80
+  },
+  "test_environment": {
+    "cache_size": 1000,
+    "concurrent_limit": 50,
+    "log_level": "INFO"
+  }
+}

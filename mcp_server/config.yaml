@@ -1,0 +1,69 @@
+# MCP Server Configuration
+# This file contains the default configuration for the AI Prompt Engineering System MCP Server
+
+# Environment settings
+environment: "development"  # development, staging, production
+debug: false
+
+# Database configuration
+database:
+  path: "ai_prompt_system/database/prompt_system.db"
+  connection_timeout: 30
+  max_connections: 10
+  backup_enabled: true
+  backup_interval_hours: 24
+
+# Cache configuration
+cache:
+  enabled: true
+  max_size: 1000
+  ttl_seconds: 3600
+  cleanup_interval: 300
+
+# Logging configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_enabled: true
+  file_path: "mcp_server.log"
+  max_file_size_mb: 10
+  backup_count: 5
+  console_enabled: true
+
+# Performance and monitoring
+performance:
+  enable_metrics: true
+  metrics_retention_hours: 24
+  slow_query_threshold_ms: 100
+  max_concurrent_requests: 50
+  request_timeout_seconds: 30
+
+# MCP server settings
+mcp:
+  name: "AI Prompt Engineering System"
+  version: "1.0.0"
+  description: "MCP server for AI prompt engineering with hierarchical rules"
+  dependencies:
+    - "sqlite3"
+    - "jinja2"
+    - "pydantic"
+
+  # Server behavior
+  enable_mock_mode: false
+  validate_schemas: true
+  enable_completions: true
+
+  # Transport settings
+  transport_type: "stdio"  # stdio, sse, websocket
+  host: "localhost"
+  port: 8000
+
+# Security configuration
+security:
+  enable_authentication: false
+  enable_authorization: false
+  api_key_required: false
+  allowed_origins:
+    - "*"
+  rate_limit_enabled: false
+  rate_limit_requests_per_minute: 60

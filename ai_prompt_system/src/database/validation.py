@@ -410,6 +410,50 @@ def quick_validate() -> bool:
         return False
 
 
+def validate_database_integrity(db_manager) -> Dict[str, Any]:
+    """
+    Quick database integrity validation for health checks.
+
+    Args:
+        db_manager: DatabaseManager instance
+
+    Returns:
+        Dict with validation results
+    """
+    try:
+        # Test basic database operations
+        result = db_manager.execute_query("SELECT COUNT(*) FROM primitive_rules")
+        if result is None:
+            return {
+                "valid": False,
+                "issues": ["Cannot execute basic query on primitive_rules table"]
+            }
+
+        # Test other tables
+        tables = ["semantic_rules", "task_rules", "semantic_primitive_relations", "task_semantic_relations"]
+        for table in tables:
+            result = db_manager.execute_query(f"SELECT COUNT(*) FROM {table}")
+            if result is None:
+                return {
+                    "valid": False,
+                    "issues": [f"Cannot access table {table}"]
+                }
+
+        return {
+            "valid": True,
+            "issues": [],
+            "primitive_rules": db_manager.execute_query("SELECT COUNT(*) FROM primitive_rules")[0],
+            "semantic_rules": db_manager.execute_query("SELECT COUNT(*) FROM semantic_rules")[0],
+            "task_rules": db_manager.execute_query("SELECT COUNT(*) FROM task_rules")[0]
+        }
+
+    except Exception as e:
+        return {
+            "valid": False,
+            "issues": [f"Database validation error: {str(e)}"]
+        }
+
+
 if __name__ == "__main__":
     # Run validation when called directly
     results = validate_database()
