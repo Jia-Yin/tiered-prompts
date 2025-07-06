@@ -12,12 +12,113 @@ from .connection import db_manager, validate_json_field
 logger = logging.getLogger(__name__)
 
 
+class CategoryCRUD:
+    """CRUD operations for categories."""
+
+    def __init__(self):
+        self.table_name = 'categories'
+
+    def create_category(
+        self,
+        name: str,
+        description: str = None,
+        color: str = '#6B7280',
+        icon: str = None
+    ) -> int:
+        """Create a new category."""
+        query = """
+            INSERT INTO categories (name, description, color, icon)
+            VALUES (?, ?, ?, ?)
+        """
+        return db_manager.execute_insert(query, (name, description, color, icon))
+
+    def get_by_id(self, category_id: int) -> Optional[Dict[str, Any]]:
+        """Get category by ID."""
+        query = "SELECT * FROM categories WHERE id = ?"
+        results = db_manager.execute_query(query, (category_id,))
+        return results[0] if results else None
+
+    def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get category by name."""
+        query = "SELECT * FROM categories WHERE name = ?"
+        results = db_manager.execute_query(query, (name,))
+        return results[0] if results else None
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        """Get all categories."""
+        query = "SELECT * FROM categories ORDER BY name"
+        return db_manager.execute_query(query)
+
+    def update_category(
+        self,
+        category_id: int,
+        name: str = None,
+        description: str = None,
+        color: str = None,
+        icon: str = None
+    ) -> bool:
+        """Update a category."""
+        updates = []
+        values = []
+
+        if name is not None:
+            updates.append("name = ?")
+            values.append(name)
+        if description is not None:
+            updates.append("description = ?")
+            values.append(description)
+        if color is not None:
+            updates.append("color = ?")
+            values.append(color)
+        if icon is not None:
+            updates.append("icon = ?")
+            values.append(icon)
+
+        if not updates:
+            return False
+
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(category_id)
+
+        query = f"UPDATE categories SET {', '.join(updates)} WHERE id = ?"
+        return db_manager.execute_update(query, tuple(values)) > 0
+
+    def delete_category(self, category_id: int) -> bool:
+        """Delete a category (only if not referenced by any rules)."""
+        # Check if category is being used
+        tables = ['primitive_rules', 'semantic_rules', 'task_rules']
+        for table in tables:
+            query = f"SELECT COUNT(*) as count FROM {table} WHERE category_id = ?"
+            result = db_manager.execute_query(query, (category_id,))
+            if result[0]['count'] > 0:
+                raise ValueError(f"Cannot delete category: still referenced by {table}")
+
+        query = "DELETE FROM categories WHERE id = ?"
+        return db_manager.execute_update(query, (category_id,)) > 0
+
+
 class BaseRuleCRUD:
     """Base class for rule CRUD operations."""
 
     def __init__(self, table_name: str, content_field: str):
         self.table_name = table_name
         self.content_field = content_field
+        self.category_crud = CategoryCRUD()
+
+    def _get_or_create_category_id(self, category: Optional[str]) -> Optional[int]:
+        """Gets the category ID or creates a new category if it doesn't exist."""
+        if not category:
+            return None
+
+        category_obj = self.category_crud.get_by_name(category)
+        if category_obj:
+            return category_obj['id']
+        else:
+            logger.info(f"Category '{category}' not found. Creating it.")
+            return self.category_crud.create_category(
+                name=category,
+                description=f"Auto-created category: {category}"
+            )
 
     def create(self, **kwargs) -> int:
         """Create a new rule."""
@@ -44,6 +145,18 @@ class BaseRuleCRUD:
         results = db_manager.execute_query(query, (rule_id,))
         return results[0] if results else None
 
+    def get_by_id_with_category(self, rule_id: int) -> Optional[Dict[str, Any]]:
+        """Get rule by ID with category information."""
+        query = f"""
+            SELECT r.*, c.name as category_name, c.description as category_description,
+                   c.color as category_color, c.icon as category_icon
+            FROM {self.table_name} r
+            LEFT JOIN categories c ON r.category_id = c.id
+            WHERE r.id = ?
+        """
+        results = db_manager.execute_query(query, (rule_id,))
+        return results[0] if results else None
+
     def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """Get rule by name."""
         query = f"SELECT * FROM {self.table_name} WHERE name = ?"
@@ -58,10 +171,16 @@ class BaseRuleCRUD:
 
         return db_manager.execute_query(query)
 
-    def get_by_category(self, category: str) -> List[Dict[str, Any]]:
-        """Get rules by category."""
-        query = f"SELECT * FROM {self.table_name} WHERE category = ? ORDER BY created_at DESC"
-        return db_manager.execute_query(query, (category,))
+    def get_by_category(self, category_name: str) -> List[Dict[str, Any]]:
+        """Get all rules by category name."""
+        query = f"""
+            SELECT r.*, c.name as category_name
+            FROM {self.table_name} r
+            LEFT JOIN categories c ON r.category_id = c.id
+            WHERE c.name = ?
+            ORDER BY r.created_at DESC
+        """
+        return db_manager.execute_query(query, (category_name,))
 
     def update(self, rule_id: int, **kwargs) -> bool:
         """Update rule by ID."""
@@ -126,14 +245,12 @@ class PrimitiveRuleCRUD(BaseRuleCRUD):
         category: str = None
     ) -> int:
         """Create a new primitive rule with validation."""
-        if category and category not in ['instruction', 'format', 'constraint', 'pattern']:
-            raise ValueError(f"Invalid category: {category}")
-
+        category_id = self._get_or_create_category_id(category)
         return self.create(
             name=name,
             content=content,
             description=description,
-            category=category
+            category_id=category_id
         )
 
 
@@ -151,15 +268,12 @@ class SemanticRuleCRUD(BaseRuleCRUD):
         category: str = None
     ) -> int:
         """Create a new semantic rule with validation."""
-        valid_categories = ['code_review', 'explanation', 'debugging', 'optimization', 'generation']
-        if category and category not in valid_categories:
-            raise ValueError(f"Invalid category: {category}")
-
+        category_id = self._get_or_create_category_id(category)
         return self.create(
             name=name,
             content_template=content_template,
             description=description,
-            category=category
+            category_id=category_id
         )
 
 
@@ -176,20 +290,23 @@ class TaskRuleCRUD(BaseRuleCRUD):
         description: str = None,
         language: str = None,
         framework: str = None,
-        domain: str = None
+        domain: str = None,
+        category: str = None
     ) -> int:
         """Create a new task rule with validation."""
         valid_domains = ['web_dev', 'data_science', 'electrical_eng', 'mobile_dev', 'devops', 'general']
         if domain and domain not in valid_domains:
             raise ValueError(f"Invalid domain: {domain}")
 
+        category_id = self._get_or_create_category_id(category)
         return self.create(
             name=name,
             prompt_template=prompt_template,
             description=description,
             language=language,
             framework=framework,
-            domain=domain
+            domain=domain,
+            category_id=category_id
         )
 
     def get_by_domain(self, domain: str) -> List[Dict[str, Any]]:
@@ -445,3 +562,4 @@ task_crud = TaskRuleCRUD()
 relation_crud = RelationCRUD()
 version_crud = VersionCRUD()
 tag_crud = TagCRUD()
+category_crud = CategoryCRUD()

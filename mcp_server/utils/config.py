@@ -115,7 +115,27 @@ class ConfigManager:
         # Load configuration
         self._load_config()
         self._apply_environment_overrides()
+        self._resolve_paths()
         self._validate_config()
+
+    def _resolve_paths(self):
+        """Resolve paths relative to project root if specified."""
+        project_root_str = os.getenv("PROJECT_ROOT")
+        if project_root_str:
+            project_root = Path(project_root_str)
+
+            # Resolve Database Path
+            db_path = Path(self.config.database.path)
+            if not db_path.is_absolute():
+                self.config.database.path = str(project_root / db_path)
+                self.logger.info(f"Resolved database path to: {self.config.database.path}")
+
+            # Resolve Log File Path
+            log_path = Path(self.config.logging.file_path)
+            if not log_path.is_absolute():
+                # Assume log path is relative to the mcp_server directory inside project_root
+                self.config.logging.file_path = str(project_root / 'mcp_server' / log_path)
+                self.logger.info(f"Resolved log file path to: {self.config.logging.file_path}")
 
     def _load_config(self):
         """Load configuration from file or environment"""

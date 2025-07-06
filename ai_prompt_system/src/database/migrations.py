@@ -30,8 +30,14 @@ class Migration:
 class MigrationManager:
     """Manages database migrations."""
 
-    def __init__(self, migrations_dir: str = "database/migrations"):
-        self.migrations_dir = Path(migrations_dir)
+    def __init__(self, migrations_dir: str = None):
+        if migrations_dir is None:
+            # Default to the 'migrations' directory inside the 'database' directory
+            # at the same level as the 'src' directory containing this module.
+            self.migrations_dir = Path(__file__).resolve().parents[2] / "database" / "migrations"
+        else:
+            self.migrations_dir = Path(migrations_dir)
+
         self.migrations_dir.mkdir(parents=True, exist_ok=True)
         self._migration_table_created = False
 
@@ -274,6 +280,11 @@ DatabaseMigrator = MigrationManager
 
 # Global migration manager instance
 migration_manager = MigrationManager()
+
+
+def apply_migrations():
+    """Apply all pending migrations."""
+    return migration_manager.migrate_up()
 
 
 # Predefined migrations for common operations

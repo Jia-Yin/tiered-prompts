@@ -35,24 +35,18 @@ from pydantic import BaseModel, Field
 import sys
 import os
 
-# Get the absolute path to the project root
-project_root = os.environ.get('PROJECT_ROOT')
-if project_root and os.path.exists(project_root):
-    # Use environment variable if set and valid
-    project_root = os.path.abspath(project_root)
-elif os.path.basename(os.getcwd()) == 'mcp_server':
-    # If running from mcp_server directory, go up one level
-    project_root = os.path.dirname(os.getcwd())
-else:
-    # If running from project root, use current directory
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    if os.path.basename(project_root) == 'mcp_server':
-        project_root = os.path.dirname(project_root)
+# Get the absolute path of the script's directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# The project root is one level up from the script's directory (mcp_server)
+project_root = os.path.dirname(script_dir)
+
+# Add project root and source directory to Python path
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 # Change working directory to project root for proper database access
 original_cwd = os.getcwd()
-os.chdir(project_root)
-sys.path.insert(0, project_root)
+os.chdir(os.path.join(project_root, 'ai_prompt_system'))
 
 try:
     from ai_prompt_system.src.rule_engine.engine import RuleEngine
@@ -182,7 +176,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             logger.info("Initializing rule engine services...")
 
             # 1. Initialize database manager
-            context.db_manager = DatabaseManager()
+            context.db_manager = DatabaseManager("ai_prompt_system/database/prompt_system.db")
 
             # 2. Initialize cache manager
             cache_config = context.config.cache if context.config else None
@@ -208,6 +202,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
             # Log available tools and resources
             logger.info("Available tools: generate_prompt, analyze_rules, validate_rules, search_rules, optimize_rules")
+            logger.info("Available rule creation tools: create_primitive_rule, create_semantic_rule, create_task_rule, create_rule_relationship")
             logger.info("Available resources: rules://{type}, stats://performance, relationships://{id}")
             logger.info("Available prompts: create_rule_prompt, debug_rule_prompt")
 
@@ -326,9 +321,9 @@ def generate_prompt(
 
         # Use real rule engine
         result = app_context.rule_engine.generate_prompt(
-            rule_name=rule_name,
+            task_rule_name=rule_name,
             context=context or {},
-            model=target_model
+            target_model=target_model
         )
 
         return PromptResult(
@@ -588,6 +583,258 @@ def optimize_rules(
     except Exception as e:
         logger.error(f"Error optimizing rules: {e}")
         raise ValueError(f"Failed to optimize rules: {str(e)}")
+
+@mcp.tool()
+@monitored_tool
+def create_primitive_rule(
+    name: str,
+    content: str,
+    description: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a new primitive rule.
+
+    Args:
+        name: Unique name for the rule
+        content: The actual rule content/instruction
+        description: Description of what the rule does
+        category: Rule category
+
+    Returns:
+        Dictionary with result of the operation
+    """
+    try:
+        from ai_prompt_system.src.database.crud import primitive_crud
+
+        rule_id = primitive_crud.create_primitive_rule(
+            name=name,
+            content=content,
+            description=description,
+            category=category,
+        )
+        return {"success": True, "rule_id": rule_id}
+    except Exception as e:
+        logger.error(f"Error creating primitive rule: {e}")
+        return {"success": False, "error": str(e)}
+
+@mcp.tool()
+@monitored_tool
+def create_semantic_rule(
+    name: str,
+    content_template: str,
+    description: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a new semantic rule.
+
+    Args:
+        name: Unique name for the rule
+        content_template: Template content with placeholders
+        description: Description of what the rule does
+        category: Rule category
+
+    Returns:
+        Dictionary with result of the operation
+    """
+    try:
+        from ai_prompt_system.src.database.crud import semantic_crud
+
+        rule_id = semantic_crud.create_semantic_rule(
+            name=name,
+            content_template=content_template,
+            description=description,
+            category=category,
+        )
+        return {"success": True, "rule_id": rule_id}
+    except Exception as e:
+        logger.error(f"Error creating semantic rule: {e}")
+        return {"success": False, "error": str(e)}
+
+@mcp.tool()
+@monitored_tool
+def create_task_rule(
+    name: str,
+    prompt_template: str,
+    description: Optional[str] = None,
+    language: Optional[str] = None,
+    framework: Optional[str] = None,
+    domain: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a new task rule.
+
+    Args:
+        name: Unique name for the rule
+        description: Description of what the rule does
+        prompt_template: Template for the complete prompt
+        language: Programming language or context
+        framework: Framework or technology
+        domain: Domain area (web_dev, data_science, etc.)
+        category: Rule category
+
+    Returns:
+        Dictionary with result of the operation
+    """
+    try:
+        from ai_prompt_system.src.database.crud import task_crud
+
+        rule_id = task_crud.create_task_rule(
+            name=name,
+            prompt_template=prompt_template,
+            description=description,
+            language=language,
+            framework=framework,
+            domain=domain,
+            category=category,
+        )
+        return {"success": True, "rule_id": rule_id}
+    except Exception as e:
+        logger.error(f"Error creating task rule: {e}")
+        return {"success": False, "error": str(e)}
+
+@mcp.tool()
+@monitored_tool
+def create_rule_relationship(
+    parent_rule_type: str,
+    parent_rule_name: str,
+    child_rule_type: str,
+    child_rule_name: str,
+    weight: float = 1.0,
+    order_index: int = 0,
+    is_required: bool = True
+) -> Dict[str, Any]:
+    """
+    Create a relationship between rules.
+
+    Args:
+        parent_rule_type: Type of parent rule (task, semantic)
+        parent_rule_name: Name of parent rule
+        child_rule_type: Type of child rule (semantic, primitive)
+        child_rule_name: Name of child rule
+        weight: Relationship weight (0.0-1.0)
+        order_index: Order in which child rule should appear
+        is_required: Whether the child rule is required
+
+    Returns:
+        Created relationship information
+    """
+    try:
+        app_context = mcp.get_context().request_context.lifespan_context
+
+        if not app_context or not app_context.rule_engine:
+            # Mock response
+            return {
+                "parent_rule": f"{parent_rule_type}:{parent_rule_name}",
+                "child_rule": f"{child_rule_type}:{child_rule_name}",
+                "weight": weight,
+                "order_index": order_index,
+                "is_required": is_required,
+                "created": True,
+                "message": "Mock: Rule relationship would be created"
+            }
+
+        # Get rule IDs
+        if parent_rule_type == "task":
+            parent_id = app_context.db_manager.execute_query(
+                "SELECT id FROM task_rules WHERE name = ?", (parent_rule_name,)
+            )[0]['id']
+        elif parent_rule_type == "semantic":
+            parent_id = app_context.db_manager.execute_query(
+                "SELECT id FROM semantic_rules WHERE name = ?", (parent_rule_name,)
+            )[0]['id']
+        else:
+            raise ValueError(f"Invalid parent rule type: {parent_rule_type}")
+
+        if child_rule_type == "semantic":
+            child_id = app_context.db_manager.execute_query(
+                "SELECT id FROM semantic_rules WHERE name = ?", (child_rule_name,)
+            )[0]['id']
+        elif child_rule_type == "primitive":
+            child_id = app_context.db_manager.execute_query(
+                "SELECT id FROM primitive_rules WHERE name = ?", (child_rule_name,)
+            )[0]['id']
+        else:
+            raise ValueError(f"Invalid child rule type: {child_rule_type}")
+
+        # Create relationship
+        from ai_prompt_system.src.database.crud import relation_crud
+
+        if parent_rule_type == "task" and child_rule_type == "semantic":
+            relation_crud.create_task_semantic_relation(
+                parent_id, child_id, weight, order_index, is_required
+            )
+        elif parent_rule_type == "semantic" and child_rule_type == "primitive":
+            relation_crud.create_semantic_primitive_relation(
+                parent_id, child_id, weight, order_index, is_required
+            )
+        else:
+            raise ValueError(f"Invalid relationship type: {parent_rule_type} -> {child_rule_type}")
+
+        return {
+            "parent_rule": f"{parent_rule_type}:{parent_rule_name}",
+            "child_rule": f"{child_rule_type}:{child_rule_name}",
+            "weight": weight,
+            "order_index": order_index,
+            "is_required": is_required,
+            "created": True,
+            "message": f"Successfully created relationship: {parent_rule_name} -> {child_rule_name}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating rule relationship: {e}")
+        raise ValueError(f"Failed to create rule relationship: {str(e)}")
+
+@mcp.tool()
+@monitored_tool
+def create_category(
+    name: str,
+    description: Optional[str] = None,
+    color: Optional[str] = "#6B7280",
+    icon: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a new category.
+
+    Args:
+        name: Unique name for the category
+        description: Description of the category
+        color: Hex color code for the category
+        icon: Icon for the category
+
+    Returns:
+        Dictionary with result of the operation
+    """
+    try:
+        from ai_prompt_system.src.database.crud import category_crud
+
+        category_id = category_crud.create_category(
+            name=name, description=description, color=color, icon=icon
+        )
+        return {"success": True, "category_id": category_id}
+    except Exception as e:
+        logger.error(f"Error creating category: {e}")
+        return {"success": False, "error": str(e)}
+
+@mcp.tool()
+@monitored_tool
+def list_categories() -> Dict[str, Any]:
+    """
+    List all available categories.
+
+    Returns:
+        Dictionary with a list of categories
+    """
+    try:
+        from ai_prompt_system.src.database.crud import category_crud
+
+        categories = category_crud.get_all()
+        return {"success": True, "categories": categories}
+    except Exception as e:
+        logger.error(f"Error listing categories: {e}")
+        return {"success": False, "error": str(e)}
 
 # ============================================================================
 # MONITORED RESOURCES - Resources with performance monitoring
@@ -993,6 +1240,12 @@ async def handle_completion(
 
         # Complete domains for rule creation
         if argument.name == "domain":
+            search_types = ["content", "name", "metadata"]
+            matches = [st for st in search_types if st.startswith(argument.value)]
+            return Completion(values=matches, hasMore=False)
+
+        # Complete domains for rule creation
+        if argument.name == "domain":
             domains = ["general", "coding", "documentation", "analysis", "creative"]
             matches = [d for d in domains if d.startswith(argument.value)]
             return Completion(values=matches, hasMore=False)
@@ -1011,6 +1264,7 @@ def main():
     """Main entry point for the FastMCP server"""
     logger.info("Starting AI Prompt Engineering System FastMCP Server...")
     logger.info("Available tools: generate_prompt, analyze_rules, validate_rules, search_rules, optimize_rules")
+    logger.info("Available rule creation tools: create_primitive_rule, create_semantic_rule, create_task_rule, create_rule_relationship")
     logger.info("Available resources: rules://{type}, stats://performance, relationships://{id}")
     logger.info("Available prompts: create_rule_prompt, debug_rule_prompt")
 

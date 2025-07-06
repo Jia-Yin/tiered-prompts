@@ -79,23 +79,22 @@ A structured prompt engineering system inspired by PrimeVue's token-based themin
 
 ---
 
-## Phase 3: MCP Tools Development ✅
-**Duration: 4-5 days** | **Status: COMPLETED** | **Date: July 5, 2025**
+## Phase 3: MCP Tools Development & Refactoring ✅
+**Duration: 5-6 days** | **Status: COMPLETED** | **Date: July 6, 2025**
 
 ### 概述
-建立完整的 MCP (Model Context Protocol) 伺服器，將 Phase 2 規則引擎功能透過標準化協議暴露給 AI 客戶端。
+建立完整的 MCP (Model Context Protocol) 伺服器，將 Phase 2 規則引擎功能透過標準化協議暴露給 AI 客戶端。此階段後期進行了全面的重構和整合，以支援新的分類系統並提高系統的穩健性和可維護性。
 
 ### 主要成就
-- ✅ 完整 MCP 伺服器架構實現 (FastMCP)
-- ✅ 5個核心工具: generate_prompt, analyze_rules, validate_rules, search_rules, optimize_rules
-- ✅ 3個資源類型: rules hierarchy, performance stats, rule relationships
-- ✅ 官方 MCP SDK 整合 (Phase 3.1)
-- ✅ 生產級功能實現 (Phase 3.2): 日誌記錄、監控、配置管理
-- ✅ 整合測試準備 (Phase 3.3): Claude Desktop 配置、測試案例
+- ✅ **完整 MCP 伺服器**: 實現了基於 FastMCP 的高效能伺服器。
+- ✅ **核心工具集**: 實現了 8 個核心工具，包括規則的創建、生成、分析、驗證、搜尋和優化。
+- ✅ **統一 CRUD 層**: 將資料庫操作邏輯合併到單一的 `crud.py` 模組中，並支援自動分類創建。
+- ✅ **穩健的配置管理**: 修復了路徑解析問題，使伺服器啟動更加可靠。
+- ✅ **端到端驗證**: 通過直接資料庫測試和 MCP 工具呼叫，全面驗證了系統功能。
+- ✅ **生產級功能**: 實現了日誌記錄、監控和環境配置管理。
 
 ### 核心指標
-- **工具覆蓋**: 5/5 工具完全實現
-- **資源提供**: 3/3 資源類型可用
+- **工具覆蓋**: 8/8 核心工具完全實現
 - **協議相容**: 100% MCP 標準相容
 - **生產就緒**: 監控、日誌、配置管理完整
 
@@ -103,125 +102,17 @@ A structured prompt engineering system inspired by PrimeVue's token-based themin
 
 ### 交付成果
 - [x] 完整 MCP 伺服器實現 (FastMCP)
-- [x] 所有規劃工具和資源
-- [x] CLI 測試介面和自動化測試
-- [x] 與 Phase 2 規則引擎整合
-- [x] 完整文檔和使用範例
-- [x] 官方 MCP SDK 整合 (Phase 3.1) ✅
-- [x] 生產級功能 (Phase 3.2) ✅
-- [x] 整合測試準備 (Phase 3.3) ✅
+- [x] 所有規劃的 CRUD 和分析工具
+- [x] 統一且經過測試的資料庫 CRUD 層
+- [x] 穩健的伺服器配置和路徑解析
+- [x] 修正並經過驗證的資料庫遷移腳本
+- [x] 完整的端到端功能驗證
 
 **下一階段**: Phase 4 Web 介面開發
-- Suggest new rules based on technology updates
-
-### Tool 3: Rule Organizer
-```python
-@mcp_tool("organize_rules")
-async def organize_rules(optimization_level: str = "basic") -> dict
-```
-- Analyze and optimize rule relationships
-- Detect redundant or conflicting rules
-- Suggest rule consolidations and improvements
-
-### Tool 4: Prompt Generator
-```python
-@mcp_tool("generate_prompt")
-async def generate_prompt(task_rule_name: str, context: dict = None, target_model: str = "claude") -> str
-```
-- Resolve complete rule hierarchy
-- Generate model-specific formatted prompts
-- Apply context-specific customizations
-
-### Tool 5: Rule Analytics
-```python
-@mcp_tool("analyze_rule_usage")
-async def analyze_rule_usage(timeframe: str = "30d") -> dict
-```
-- Track rule usage patterns
-- Identify popular and unused rules
-- Generate optimization recommendations
-
-### Checklist
-- [ ] Implement codebase AST parsing (Python, JavaScript, TypeScript)
-- [ ] Create pattern detection algorithms
-- [ ] Build web scraping module for documentation
-- [ ] Implement rule suggestion engine
-- [ ] Create rule optimization algorithms
-- [ ] Build prompt generation with model-specific formatting
-- [ ] Add rule usage analytics and tracking
-- [ ] Implement comprehensive error handling
-- [ ] Create tool integration tests
-- [ ] Write MCP server configuration
 
 ---
 
-## Phase 4: Web Interface Development
-**Duration: 5-6 days**
-
-### Technology Stack
-- **Backend**: FastAPI (Python) - fits your Python preference
-- **Frontend**: Nuxt.js with PrimeVue and TailwindCSS - matches your tech stack
-- **Database**: SQLite with SQLAlchemy ORM
-
-### Key Features
-1. **Dashboard**: Overview of all rules, usage statistics, recent changes
-2. **Rule Management**: CRUD operations for all rule types
-3. **Relationship Editor**: Visual interface for managing rule dependencies
-4. **Prompt Testing**: Live prompt generation and testing interface
-5. **Import/Export**: Rule backup, sharing, and migration tools
-6. **Analytics**: Usage patterns, performance metrics, optimization suggestions
-
-### Backend API Endpoints
-```python
-# Rule Management
-GET/POST/PUT/DELETE /api/rules/{rule_type}
-GET/POST/PUT/DELETE /api/rules/{rule_type}/{id}
-
-# Relationships
-GET/POST/PUT/DELETE /api/relationships/semantic-primitive
-GET/POST/PUT/DELETE /api/relationships/task-semantic
-
-# Prompt Generation
-POST /api/generate-prompt
-POST /api/test-prompt
-
-# Analytics
-GET /api/analytics/usage
-GET /api/analytics/performance
-```
-
-### Frontend Pages
-```
-/dashboard - Main overview
-/rules/primitive - Primitive rules management
-/rules/semantic - Semantic rules management
-/rules/task - Task rules management
-/relationships - Visual relationship editor
-/prompt-testing - Live prompt generation interface
-/analytics - Usage and performance analytics
-/settings - System configuration
-```
-
-### Checklist
-- [ ] Set up FastAPI backend with SQLAlchemy
-- [ ] Create API endpoints for all rule operations
-- [ ] Implement relationship management APIs
-- [ ] Set up Nuxt.js frontend with PrimeVue
-- [ ] Create rule management interfaces
-- [ ] Build visual relationship editor
-- [ ] Implement prompt testing interface
-- [ ] Create analytics dashboard
-- [ ] Add authentication and authorization
-- [ ] Implement real-time updates with WebSockets
-- [ ] Create responsive design for mobile
-- [ ] Add comprehensive form validation
-- [ ] Implement search and filtering
-- [ ] Create export/import functionality
-- [ ] Write frontend unit tests
-
----
-
-## Phase 5: Integration & Advanced Features
+## Phase 4: Integration & Advanced Features
 **Duration: 3-4 days**
 
 ### MCP-Web Interface Integration
@@ -249,7 +140,7 @@ GET /api/analytics/performance
 
 ---
 
-## Phase 6: Testing & Documentation
+## Phase 5: Testing & Documentation
 **Duration: 2-3 days**
 
 ### Testing Strategy
@@ -280,7 +171,7 @@ GET /api/analytics/performance
 
 ---
 
-## Phase 7: Deployment & Production Setup
+## Phase 6: Deployment & Production Setup
 **Duration: 1-2 days**
 
 ### Deployment Options

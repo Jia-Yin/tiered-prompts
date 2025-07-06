@@ -3,7 +3,7 @@ Main Rule Engine: Orchestrates all rule engine components.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
 from .resolver import RuleResolver
@@ -185,6 +185,136 @@ class RuleEngine:
 
         except Exception as e:
             logger.error(f"Error getting dependencies for {rule_type} rule '{rule_name}': {e}")
+            raise
+
+    def analyze_rules(self, rule_type: str, include_dependencies: bool = False, rule_id: Optional[Union[int, str]] = None) -> Dict[str, Any]:
+        """
+        Analyze rules of a given type.
+
+        Args:
+            rule_type: Type of rules to analyze (primitive, semantic, task, all)
+            include_dependencies: Whether to include dependency analysis
+            rule_id: Specific rule ID to analyze (optional)
+
+        Returns:
+            Dictionary with analysis results
+        """
+        try:
+            rules = self.resolver.get_rules_by_type(rule_type)
+
+            analysis = {
+                "rule_type": rule_type,
+                "total_rules": len(rules),
+                "rules": rules,
+                "dependencies": [],
+                "relationships": [],
+                "performance_metrics": {
+                    "query_time": 0,
+                    "rules_processed": len(rules)
+                }
+            }
+
+            if include_dependencies:
+                all_deps = []
+                for rule in rules:
+                    deps = self.resolver.get_rule_dependencies(rule['type'], rule['id'])
+                    all_deps.append({"rule": rule['name'], "dependencies": deps})
+                analysis['dependencies'] = all_deps
+
+            return analysis
+        except Exception as e:
+            logger.error(f"Error analyzing rules for type '{rule_type}': {e}")
+            raise
+
+    def search_rules(self, query: str, search_type: str = "content", rule_type: str = "all", limit: int = 10) -> Dict[str, Any]:
+        """
+        Search rules by content, name, or metadata.
+
+        Args:
+            query: Search query string
+            search_type: Type of search (content, name, metadata)
+            rule_type: Type of rules to search (primitive, semantic, task, all)
+            limit: Maximum number of results to return
+
+        Returns:
+            Dictionary with search results
+        """
+        import time
+        start_time = time.time()
+
+        try:
+            results = []
+
+            # Determine which tables to search
+            if rule_type == "all":
+                tables = ["primitive_rules", "semantic_rules", "task_rules"]
+            else:
+                tables = [f"{rule_type}_rules"]
+
+            for table in tables:
+                # Build search query based on search_type
+                if search_type == "content":
+                    if table == "primitive_rules":
+                        search_query = f"SELECT id, name, description, category, content FROM {table} WHERE content LIKE ? OR description LIKE ? LIMIT ?"
+                    elif table == "semantic_rules":
+                        search_query = f"SELECT id, name, description, category, content_template as content FROM {table} WHERE content_template LIKE ? OR description LIKE ? LIMIT ?"
+                    else:  # task_rules
+                        search_query = f"SELECT id, name, description, domain, prompt_template as content FROM {table} WHERE prompt_template LIKE ? OR description LIKE ? LIMIT ?"
+                elif search_type == "name":
+                    search_query = f"SELECT id, name, description FROM {table} WHERE name LIKE ? LIMIT ?"
+                elif search_type == "metadata":
+                    if table == "primitive_rules":
+                        search_query = f"SELECT id, name, description, category FROM {table} WHERE category LIKE ? OR description LIKE ? LIMIT ?"
+                    elif table == "semantic_rules":
+                        search_query = f"SELECT id, name, description, category FROM {table} WHERE category LIKE ? OR description LIKE ? LIMIT ?"
+                    else:  # task_rules
+                        search_query = f"SELECT id, name, description, domain, language, framework FROM {table} WHERE domain LIKE ? OR language LIKE ? OR framework LIKE ? OR description LIKE ? LIMIT ?"
+
+                # Execute search
+                search_pattern = f"%{query}%"
+                if search_type == "name":
+                    params = (search_pattern, limit)
+                elif search_type == "metadata" and table == "task_rules":
+                    params = (search_pattern, search_pattern, search_pattern, search_pattern, limit)
+                else:
+                    params = (search_pattern, search_pattern, limit)
+
+                try:
+                    table_results = self.db.execute_query(search_query, params)
+                    for row in table_results:
+                        result = dict(row)
+                        result['rule_type'] = table.replace('_rules', '')
+                        results.append(result)
+                except Exception as e:
+                    logger.warning(f"Error searching {table}: {e}")
+                    continue
+
+            # Sort results by relevance (name matches first, then content matches)
+            results.sort(key=lambda x: (
+                0 if query.lower() in x.get('name', '').lower() else 1,
+                x.get('name', '').lower()
+            ))
+
+            # Limit total results
+            results = results[:limit]
+
+            search_time = time.time() - start_time
+
+            return {
+                "query": query,
+                "search_type": search_type,
+                "rule_type": rule_type,
+                "results": results,
+                "total_found": len(results),
+                "search_time": search_time,
+                "performance_metrics": {
+                    "query_time": search_time,
+                    "results_processed": len(results)
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error searching rules: {e}")
             raise
 
     def analyze_rule_usage(self, days: int = 30) -> Dict[str, Any]:

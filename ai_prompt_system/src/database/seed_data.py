@@ -93,6 +93,9 @@ Code to review:
 {{code_snippet}}
 
 Focus areas: {{focus_areas}}
+
+Guidelines to follow:
+{{primitive_rules}}
 ''',
                 'category': 'code_review'
             },
@@ -111,6 +114,9 @@ Provide:
 2. Step-by-step debugging approach
 3. Suggested fixes
 4. Prevention strategies
+
+Guidelines to follow:
+{{primitive_rules}}
 ''',
                 'category': 'debugging'
             },
@@ -128,6 +134,9 @@ Include:
 - Best practices
 
 Target audience: {{audience_level}}
+
+Guidelines to follow:
+{{primitive_rules}}
 ''',
                 'category': 'explanation'
             },
@@ -146,6 +155,9 @@ Provide:
 2. Optimization opportunities
 3. Recommended improvements
 4. Trade-offs and considerations
+
+Guidelines to follow:
+{{primitive_rules}}
 ''',
                 'category': 'optimization'
             }

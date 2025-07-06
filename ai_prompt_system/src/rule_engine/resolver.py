@@ -193,6 +193,34 @@ class RuleResolver:
 
         return dependencies
 
+    def get_rules_by_type(self, rule_type: str) -> List[Dict[str, Any]]:
+        """
+        Get all rules of a specific type.
+
+        Args:
+            rule_type: Type of rule ('task', 'semantic', 'primitive', 'all')
+
+        Returns:
+            List of rule dictionaries
+        """
+        if rule_type == 'all':
+            task_rules = self.db.execute_query("SELECT id, name, 'task' as type FROM task_rules")
+            semantic_rules = self.db.execute_query("SELECT id, name, 'semantic' as type FROM semantic_rules")
+            primitive_rules = self.db.execute_query("SELECT id, name, 'primitive' as type FROM primitive_rules")
+            return task_rules + semantic_rules + primitive_rules
+
+        table_name = f"{rule_type}_rules"
+        if rule_type not in ['task', 'semantic', 'primitive']:
+            raise ValueError(f"Invalid rule type: {rule_type}")
+
+        query = f"SELECT id, name, '{rule_type}' as type FROM {table_name}"
+        try:
+            results = self.db.execute_query(query)
+            return results
+        except Exception as e:
+            logger.error(f"Error getting {rule_type} rules: {e}")
+            raise
+
     def _get_task_rule(self, task_id: int) -> Optional[Dict[str, Any]]:
         """Get task rule by ID."""
         try:

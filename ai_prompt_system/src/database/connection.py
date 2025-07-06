@@ -16,13 +16,17 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Manages SQLite database connections and operations."""
 
-    def __init__(self, db_path: str = "database/prompt_system.db"):
+    def __init__(self, db_path: str = None):
         """
         Initialize database manager.
 
         Args:
             db_path: Path to SQLite database file
         """
+        if db_path is None:
+            # Use absolute path to the correct database location
+            db_path = "/home/jyw/Program/tiered-prompts/ai_prompt_system/database/prompt_system.db"
+
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialized = False

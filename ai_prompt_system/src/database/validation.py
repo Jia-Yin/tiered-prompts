@@ -115,8 +115,14 @@ class DatabaseValidator:
             if not rule.get('content', '').strip():
                 issues.append(f"Primitive rule '{rule['name']}' has empty content")
 
-            if rule.get('category') and rule['category'] not in ['instruction', 'format', 'constraint', 'pattern']:
-                issues.append(f"Primitive rule '{rule['name']}' has invalid category: {rule['category']}")
+            # Validate category_id exists in categories table
+            if rule.get('category_id'):
+                category_exists = db_manager.execute_query(
+                    "SELECT COUNT(*) as count FROM categories WHERE id = ?",
+                    (rule['category_id'],)
+                )
+                if not category_exists or category_exists[0]['count'] == 0:
+                    issues.append(f"Primitive rule '{rule['name']}' references non-existent category ID: {rule['category_id']}")
 
         # Check semantic rules
         semantic_rules = semantic_crud.get_all()
@@ -124,9 +130,14 @@ class DatabaseValidator:
             if not rule.get('content_template', '').strip():
                 issues.append(f"Semantic rule '{rule['name']}' has empty content template")
 
-            valid_categories = ['code_review', 'explanation', 'debugging', 'optimization', 'generation']
-            if rule.get('category') and rule['category'] not in valid_categories:
-                issues.append(f"Semantic rule '{rule['name']}' has invalid category: {rule['category']}")
+            # Validate category_id exists in categories table
+            if rule.get('category_id'):
+                category_exists = db_manager.execute_query(
+                    "SELECT COUNT(*) as count FROM categories WHERE id = ?",
+                    (rule['category_id'],)
+                )
+                if not category_exists or category_exists[0]['count'] == 0:
+                    issues.append(f"Semantic rule '{rule['name']}' references non-existent category ID: {rule['category_id']}")
 
         # Check task rules
         task_rules = task_crud.get_all()

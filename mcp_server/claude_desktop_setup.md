@@ -27,7 +27,6 @@ Add the following to your `claude_desktop_config.json`:
       "command": "uv",
       "args": [
         "run",
-        "python",
         "fastmcp_server.py"
       ],
       "cwd": "/home/jyw/Program/tiered-prompts/mcp_server",

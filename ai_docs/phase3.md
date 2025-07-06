@@ -78,6 +78,45 @@ def search_rules(
     """搜尋規則內容和元資料"""
 ```
 
+#### T6: 規則創建工具 (Primitive)
+```python
+@mcp.tool()
+def create_primitive_rule(
+    name: str,
+    content: str,
+    description: str = None,
+    category: str = None
+) -> dict:
+    """創建一個新的原始規則"""
+```
+
+#### T7: 規則創建工具 (Semantic)
+```python
+@mcp.tool()
+def create_semantic_rule(
+    name: str,
+    content_template: str,
+    description: str = None,
+    category: str = None
+) -> dict:
+    """創建一個新的語義規則"""
+```
+
+#### T8: 規則創建工具 (Task)
+```python
+@mcp.tool()
+def create_task_rule(
+    name: str,
+    prompt_template: str,
+    description: str = None,
+    category: str = None,
+    domain: str = None,
+    framework: str = None,
+    language: str = None
+) -> dict:
+    """創建一個新的任務規則"""
+```
+
 ### 2. MCP 資源 (Resources)
 LLM 可以存取的資料源：
 
@@ -198,79 +237,30 @@ get_rule_relationships(rule_id)    # relationships://task:1
 - **路徑解析**: 自動找到 ai_prompt_system 模組
 - **類型安全**: 完整的類型提示和驗證
 
-### 技術實現亮點
+---
 
-#### 伺服器類別設計
-```python
-class MCPServer:
-    """簡化的 MCP 伺服器實現"""
+## Phase 3.5: 重構與整合 (2025年7月6日)
 
-    def __init__(self):
-        self.context = ServerContext()
-        self._initialize_services()  # 自動初始化服務
+在完成核心功能後，進行了一次全面的重構和整合，以提高系統的穩健性、可維護性和一致性。
 
-    def _initialize_services(self):
-        """智能服務初始化，支援優雅降級"""
-        if RULE_ENGINE_AVAILABLE:
-            # 使用真實規則引擎
-        else:
-            # 使用 Mock 響應
-```
+### 1. 統一和增強的 CRUD 層
+- **合併 CRUD 邏輯**: 將 `extended_crud.py` 的功能（特別是即時分類創建）合併到主 `crud.py` 模組中，消除了程式碼重複，並為所有資料庫互動創建了單一、權威的來源。
+- **穩健的分類處理**: 核心的 `create_*_rule` 函數現在可以無縫處理分類分配。如果指定的分類不存在，它會被自動創建並連結到新規則，簡化了 API 並改善了用戶體驗。
 
-#### 統一的工具響應格式
-```json
-{
-  "success": true,
-  "data": {...},
-  "metadata": {
-    "tool_name": "generate_prompt",
-    "execution_time": 0.015,
-    "parameters": {...}
-  }
-}
-```
+### 2. 精簡的專案結構
+- **單一資料庫來源**: 刪除了多餘的 `mcp_server/database` 目錄。整個專案現在正確地引用位於 `ai_prompt_system/database/` 的中央資料庫和遷移，防止了配置漂移並簡化了維護。
 
-#### CLI 測試介面
-```bash
-> generate_prompt react_component_review {"component":"UserProfile"} claude
-> analyze_rules task true 1
-> get_hierarchy primitive
-> get_stats
-```
+### 3. 穩健的配置和路徑
+- **絕對路徑解析**: 增強了 `mcp_server/utils/config.py` 中的 `ConfigManager`，使用 `PROJECT_ROOT` 環境變數在啟動時將資料庫和日誌文件的相對路徑解析為絕對路徑。
+- **修復啟動錯誤**: 此更改永久修復了在從不同工作目錄運行伺服器時發生的 `ValueError: Database directory does not exist` 錯誤，使伺服器更具可移植性和穩健性。
 
-### 架構優勢
+### 4. 改進的資料庫遷移
+- **冪等遷移腳本**: `003_add_categories_table.sql` 腳本被修正為完全冪等的 (`CREATE TABLE IF NOT EXISTS`)，確保遷移可以在新舊資料庫上安全運行而不會導致錯誤。
+- **僅包含結構的遷移**: 清理了腳本，使其僅包含結構定義（DDL）語句，這是遷移的最佳實踐。
 
-#### 核心設計原則實現
-- **模組化設計**: 清晰的組件分離，易於維護和擴展 ✅
-- **依賴注入**: 規則引擎服務注入，提高可測試性 ✅
-- **介面優先**: 明確的 MCP 工具介面，確保協議相容性 ✅
-- **效能導向**: Mock 模式和快取準備，滿足生產需求 ✅
-
-#### MCP 協議優勢
-- **標準化介面**: 與任何 MCP 客戶端相容
-- **工具發現**: AI 客戶端自動發現功能
-- **資源存取**: 結構化資料提供給 AI
-- **提示模板**: 可重複使用的互動模式
-
-### 測試和驗證
-
-#### 測試覆蓋範圍
-- ✅ **單元測試**: 每個工具和資源獨立測試
-- ✅ **整合測試**: 與規則引擎的整合驗證
-- ✅ **CLI 測試**: 互動式功能驗證
-- ✅ **Mock 測試**: 獨立運行能力驗證
-
-#### 驗證方法
-```bash
-# 方法 1: CLI 模式測試
-python mcp_server/server.py --mode cli
-
-# 方法 2: Python API 測試
-python test_mcp_server.py
-
-# 方法 3: 直接導入測試
-python -c "from mcp_server import MCPServer; print('成功')"
-```
+### 5. 全面的端到端驗證
+- **直接資料庫邏輯測試**: 創建了臨時測試腳本 `refactor_verification_test.py`，在受控環境中直接快速地測試合併後的 CRUD 邏輯。
+- **成功的 MCP 工具驗證**: 在應用所有修復後，通過調用 `create_primitive_rule` MCP 工具進行了最終的端到端測試。成功創建帶有新分類的規則，確認了從 MCP 伺服器介面到資料庫的整個技術棧都正常工作。
 
 ---
 
@@ -489,16 +479,6 @@ python health_check.py
 - **測試案例**: 完整的功能測試覆蓋
 - **效能基準**: 響應時間和成功率目標設定
 - **生產配置**: 生產就緒的配置檔案
-
-### � **關鍵指標達成**
-
-```
-系統健康檢查: 7/7 項目通過 ✅
-MCP 工具覆蓋: 5/5 完全實現 ✅
-資源類型支援: 3/3 可用 ✅
-測試覆蓋範圍: 100% 自動化測試 ✅
-文檔完整度: 設置指南 + API 文檔 ✅
-```
 
 ### 🚀 **準備就緒狀態**
 

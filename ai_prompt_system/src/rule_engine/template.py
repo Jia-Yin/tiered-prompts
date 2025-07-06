@@ -71,15 +71,25 @@ class TemplateEngine:
         if not task_rule:
             raise ValueError("No task rule found in hierarchy")
 
-        # Render semantic rules first
-        rendered_semantics = []
-        for semantic_data in resolved_hierarchy.get('semantic_rules', []):
-            rendered_semantic = self._render_semantic_rule(semantic_data, merged_context)
-            rendered_semantics.append(rendered_semantic)
+        # Build semantic rules content dynamically
+        semantic_rules_content = []
+        all_primitive_rules_content = []
 
-        # Add rendered semantics to context
-        merged_context['semantic_rules'] = rendered_semantics
-        merged_context['semantic_content'] = '\n\n'.join(rendered_semantics)
+        for semantic_data in resolved_hierarchy.get('semantic_rules', []):
+            # Render this semantic rule with its primitive rules
+            rendered_semantic = self._render_semantic_rule_with_primitives(semantic_data, merged_context)
+            semantic_rules_content.append(rendered_semantic)
+
+            # Also collect all primitive rules for the task level
+            for primitive_rule in semantic_data.get('primitive_rules', []):
+                if primitive_rule.get('content'):
+                    rendered_primitive = self._render_primitive_rule(primitive_rule, merged_context)
+                    if rendered_primitive and rendered_primitive not in all_primitive_rules_content:
+                        all_primitive_rules_content.append(rendered_primitive)
+
+        # Add dynamic content to context
+        merged_context['semantic_rules'] = '\n\n---\n\n'.join(semantic_rules_content)
+        merged_context['primitive_rules'] = '\n\n'.join(all_primitive_rules_content)
 
         # Render final task template
         try:
@@ -88,29 +98,29 @@ class TemplateEngine:
             logger.error(f"Error rendering task rule {task_rule['id']}: {e}")
             raise
 
-    def _render_semantic_rule(self, semantic_data: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Render a semantic rule and its primitive dependencies."""
+    def _render_semantic_rule_with_primitives(self, semantic_data: Dict[str, Any], context: Dict[str, Any]) -> str:
+        """Render a semantic rule with its associated primitive rules dynamically embedded."""
         semantic_rule = semantic_data.get('semantic_rule')
         if not semantic_rule:
             return ""
 
-        # Render primitive rules first
-        rendered_primitives = []
+        # Build primitive rules content for this semantic rule
+        primitive_rules_content = []
         for primitive_rule in semantic_data.get('primitive_rules', []):
-            rendered_primitive = self._render_primitive_rule(primitive_rule, context)
-            if rendered_primitive:
-                rendered_primitives.append(rendered_primitive)
+            if primitive_rule.get('content'):
+                rendered_primitive = self._render_primitive_rule(primitive_rule, context)
+                if rendered_primitive:
+                    primitive_rules_content.append(f"- {rendered_primitive}")
 
-        # Add primitives to context
-        context_with_primitives = {
+        # Create context with primitive rules for this semantic rule
+        semantic_context = {
             **context,
-            'primitive_rules': rendered_primitives,
-            'primitive_content': '\n'.join(rendered_primitives)
+            'primitive_rules': '\n'.join(primitive_rules_content) if primitive_rules_content else ''
         }
 
         # Render semantic template
         try:
-            return self.render_template(semantic_rule['content_template'], context_with_primitives)
+            return self.render_template(semantic_rule['content_template'], semantic_context)
         except Exception as e:
             logger.error(f"Error rendering semantic rule {semantic_rule['id']}: {e}")
             return f"<!-- Error rendering semantic rule {semantic_rule['name']}: {e} -->"
