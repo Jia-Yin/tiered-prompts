@@ -1,14 +1,21 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PencilIcon, TrashIcon, PlayIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { useQueryClient } from 'react-query';
 import { Rule } from '../../types';
+import { deleteRule, handleApiError } from '../../services/api';
 
 interface RuleTableProps {
   rules: Rule[];
   onUpdate: () => void;
+  onRuleClick: (rule: Rule) => void;
 }
 
-const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate }) => {
+const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate, onRuleClick }) => {
+  const [deletingRules, setDeletingRules] = useState<Set<number>>(new Set());
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
   const getRuleTypeColor = (type: string) => {
     switch (type) {
       case 'primitive':
@@ -22,8 +29,55 @@ const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate }) => {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, rule: Rule) => {
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${rule.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingRules(prev => new Set(prev).add(rule.id));
+    try {
+      await deleteRule(rule.id);
+      
+      // Force refresh the rules data aggressively
+      await queryClient.invalidateQueries(['rules']);
+      await queryClient.refetchQueries(['rules']);
+      onUpdate(); // Also call the original update function
+    } catch (error) {
+      console.error('Error deleting rule:', error);
+      alert(`Failed to delete rule: ${handleApiError(error)}`);
+    } finally {
+      setDeletingRules(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(rule.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleGeneratePrompt = (e: React.MouseEvent, rule: Rule) => {
+    e.stopPropagation();
+    // Navigate to playground with the rule pre-selected
+    navigate('/playground', { state: { selectedRule: rule } });
+  };
+
+  const handleManageRelationships = () => {
+    // Navigate to relationships page
+    navigate('/relationships');
+  };
+
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h3 className="text-lg font-medium text-gray-900">Rules</h3>
+        <button
+          onClick={handleManageRelationships}
+          className="btn-secondary flex items-center text-sm"
+        >
+          <ArrowRightIcon className="h-4 w-4 mr-2" />
+          Manage Relationships
+        </button>
+      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -47,7 +101,7 @@ const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate }) => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {rules.map((rule) => (
-              <tr key={`${rule.type}-${rule.id}`} className="hover:bg-gray-50">
+              <tr key={`${rule.type}-${rule.id}`} onClick={() => onRuleClick(rule)} className="cursor-pointer hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
                     {rule.name}
@@ -68,22 +122,34 @@ const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate }) => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
+                    {(rule.type === 'semantic' || rule.type === 'task') && (
+                      <button
+                        onClick={(e) => handleGeneratePrompt(e, rule)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                        title="Generate Prompt"
+                      >
+                        <PlayIcon className="h-4 w-4" />
+                      </button>
+                    )}
                     <Link
                       to={`/rules/${rule.id}/edit`}
+                      onClick={(e) => e.stopPropagation()}
                       className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Edit Rule"
                     >
                       <PencilIcon className="h-4 w-4" />
                     </Link>
                     <button
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this rule?')) {
-                          // TODO: Implement delete functionality
-                          console.log('Delete rule:', rule.id);
-                        }
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      onClick={(e) => handleDelete(e, rule)}
+                      disabled={deletingRules.has(rule.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      title="Delete Rule"
                     >
-                      <TrashIcon className="h-4 w-4" />
+                      {deletingRules.has(rule.id) ? (
+                        <div className="w-4 h-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
+                      ) : (
+                        <TrashIcon className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </td>

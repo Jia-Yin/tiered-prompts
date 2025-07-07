@@ -5,6 +5,7 @@ import {
   DocumentTextIcon, 
   BeakerIcon, 
   ChartBarIcon,
+  ArrowRightIcon,
   CogIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Rules', href: '/rules', icon: DocumentTextIcon },
   { name: 'Playground', href: '/playground', icon: BeakerIcon },
+  { name: 'Relationships', href: '/relationships', icon: ArrowRightIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ];

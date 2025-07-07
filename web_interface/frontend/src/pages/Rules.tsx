@@ -9,10 +9,11 @@ import {
   ListBulletIcon,
   ShareIcon
 } from '@heroicons/react/24/outline';
-import { listRules, searchRules } from '../services/api';
+import { listRules, searchRules, getRuleDependencies } from '../services/api';
 import { Rule, SearchRulesRequest } from '../types';
 import RuleCard from '../components/Rules/RuleCard';
 import RuleTable from '../components/Rules/RuleTable';
+import RuleDetailsModal from '../components/Rules/RuleDetailsModal';
 
 const Rules: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -20,6 +21,8 @@ const Rules: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Rule[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
+  const [dependencies, setDependencies] = useState<any | null>(null);
 
   // Fetch all rules (always fetch all, filter on frontend)
   const { data: rawRules, isLoading, refetch } = useQuery(
@@ -29,6 +32,17 @@ const Rules: React.FC = () => {
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
+
+  const handleRuleClick = async (rule: Rule) => {
+    setSelectedRule(rule);
+    const deps = await getRuleDependencies(rule.type, rule.id);
+    setDependencies(deps.dependencies);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedRule(null);
+    setDependencies(null);
+  };
 
   // Ensure allRules is always an array
   const allRules = React.useMemo(() => {
@@ -88,6 +102,18 @@ const Rules: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, filterType]);
+
+  // Function to clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // Combined update function that also clears search
+  const handleUpdateWithClearSearch = () => {
+    clearSearch();
+    refetch();
+  };
 
   // Apply frontend filtering and search
   const displayRules = React.useMemo(() => {
@@ -259,18 +285,21 @@ const Rules: React.FC = () => {
                 <RuleCard 
                   key={`${rule.type}-${rule.id}`} 
                   rule={rule} 
-                  onUpdate={refetch}
+                  onUpdate={handleUpdateWithClearSearch}
+                  onRuleClick={handleRuleClick}
                 />
               ))}
             </div>
           ) : (
             <RuleTable 
               rules={displayRules} 
-              onUpdate={refetch}
+              onUpdate={handleUpdateWithClearSearch}
+              onRuleClick={handleRuleClick}
             />
           )}
         </>
       )}
+      <RuleDetailsModal rule={selectedRule} dependencies={dependencies} onClose={handleCloseModal} />
     </div>
   );
 };

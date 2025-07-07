@@ -140,8 +140,13 @@ class BaseRuleCRUD:
         return db_manager.execute_insert(query, tuple(values))
 
     def get_by_id(self, rule_id: int) -> Optional[Dict[str, Any]]:
-        """Get rule by ID."""
-        query = f"SELECT * FROM {self.table_name} WHERE id = ?"
+        """Get rule by ID, including category name."""
+        query = f"""
+            SELECT r.*, c.name as category
+            FROM {self.table_name} r
+            LEFT JOIN categories c ON r.category_id = c.id
+            WHERE r.id = ?
+        """
         results = db_manager.execute_query(query, (rule_id,))
         return results[0] if results else None
 
@@ -164,8 +169,13 @@ class BaseRuleCRUD:
         return results[0] if results else None
 
     def get_all(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict[str, Any]]:
-        """Get all rules with optional pagination."""
-        query = f"SELECT * FROM {self.table_name} ORDER BY created_at DESC"
+        """Get all rules with optional pagination, including category names."""
+        query = f"""
+            SELECT r.*, c.name as category
+            FROM {self.table_name} r
+            LEFT JOIN categories c ON r.category_id = c.id
+            ORDER BY r.created_at DESC
+        """
         if limit:
             query += f" LIMIT {limit} OFFSET {offset}"
 
@@ -191,7 +201,17 @@ class BaseRuleCRUD:
         values = []
 
         for key, value in kwargs.items():
-            if key != 'id':  # Don't allow ID updates
+            if key == 'id':  # Don't allow ID updates
+                continue
+            elif key == 'category':  # Convert category name to category_id
+                if value:
+                    category_id = self._get_or_create_category_id(value)
+                    set_clauses.append("category_id = ?")
+                    values.append(category_id)
+                else:
+                    set_clauses.append("category_id = ?")
+                    values.append(None)
+            else:
                 set_clauses.append(f"{key} = ?")
                 values.append(value)
 
@@ -328,6 +348,27 @@ class TaskRuleCRUD(BaseRuleCRUD):
 class RelationCRUD:
     """CRUD operations for rule relationships."""
 
+    def create_task_semantic_relation(
+        self,
+        task_rule_id: int,
+        semantic_rule_id: int,
+        weight: float = 1.0,
+        order_index: int = 0,
+        is_required: bool = True,
+        context_override: Dict[str, Any] = None
+    ) -> int:
+        """Create a relationship between a task rule and semantic rule."""
+        query = """
+            INSERT INTO task_semantic_relations 
+            (task_rule_id, semantic_rule_id, weight, order_index, is_required, context_override)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        context_json = json.dumps(context_override) if context_override else None
+        return db_manager.execute_insert(
+            query, 
+            (task_rule_id, semantic_rule_id, weight, order_index, is_required, context_json)
+        )
+
     def create_semantic_primitive_relation(
         self,
         semantic_rule_id: int,
@@ -336,58 +377,65 @@ class RelationCRUD:
         order_index: int = 0,
         is_required: bool = True
     ) -> int:
-        """Create semantic-primitive relationship."""
-        if not (0 <= weight <= 10):
-            raise ValueError("Weight must be between 0 and 10")
-
-        if order_index < 0:
-            raise ValueError("Order index must be non-negative")
-
+        """Create a relationship between a semantic rule and primitive rule."""
         query = """
-            INSERT INTO semantic_primitive_relations
+            INSERT INTO semantic_primitive_relations 
             (semantic_rule_id, primitive_rule_id, weight, order_index, is_required)
             VALUES (?, ?, ?, ?, ?)
         """
-
         return db_manager.execute_insert(
-            query,
+            query, 
             (semantic_rule_id, primitive_rule_id, weight, order_index, is_required)
         )
 
-    def create_task_semantic_relation(
-        self,
-        task_rule_id: int,
-        semantic_rule_id: int,
-        weight: float = 1.0,
-        order_index: int = 0,
-        is_required: bool = True,
-        context_override: str = None
-    ) -> int:
-        """Create task-semantic relationship."""
-        if not (0 <= weight <= 10):
-            raise ValueError("Weight must be between 0 and 10")
+    def get_task_semantic_relations(self, task_rule_id: int = None) -> List[Dict[str, Any]]:
+        """Get task-semantic relationships."""
+        if task_rule_id:
+            query = """
+                SELECT tsr.*, tr.name as task_name, sr.name as semantic_name
+                FROM task_semantic_relations tsr
+                JOIN task_rules tr ON tsr.task_rule_id = tr.id
+                JOIN semantic_rules sr ON tsr.semantic_rule_id = sr.id
+                WHERE tsr.task_rule_id = ?
+                ORDER BY tsr.order_index, tsr.weight DESC
+            """
+            return db_manager.execute_query(query, (task_rule_id,))
+        else:
+            query = """
+                SELECT tsr.*, tr.name as task_name, sr.name as semantic_name
+                FROM task_semantic_relations tsr
+                JOIN task_rules tr ON tsr.task_rule_id = tr.id
+                JOIN semantic_rules sr ON tsr.semantic_rule_id = sr.id
+                ORDER BY tr.name, tsr.order_index, tsr.weight DESC
+            """
+            return db_manager.execute_query(query)
 
-        if order_index < 0:
-            raise ValueError("Order index must be non-negative")
-
-        if context_override and not validate_json_field(context_override):
-            raise ValueError("Context override must be valid JSON")
-
-        query = """
-            INSERT INTO task_semantic_relations
-            (task_rule_id, semantic_rule_id, weight, order_index, is_required, context_override)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """
-
-        return db_manager.execute_insert(
-            query,
-            (task_rule_id, semantic_rule_id, weight, order_index, is_required, context_override)
-        )
+    def get_semantic_primitive_relations(self, semantic_rule_id: int = None) -> List[Dict[str, Any]]:
+        """Get semantic-primitive relationships."""
+        if semantic_rule_id:
+            query = """
+                SELECT spr.*, sr.name as semantic_name, pr.name as primitive_name
+                FROM semantic_primitive_relations spr
+                JOIN semantic_rules sr ON spr.semantic_rule_id = sr.id
+                JOIN primitive_rules pr ON spr.primitive_rule_id = pr.id
+                WHERE spr.semantic_rule_id = ?
+                ORDER BY spr.order_index, spr.weight DESC
+            """
+            return db_manager.execute_query(query, (semantic_rule_id,))
+        else:
+            query = """
+                SELECT spr.*, sr.name as semantic_name, pr.name as primitive_name
+                FROM semantic_primitive_relations spr
+                JOIN semantic_rules sr ON spr.semantic_rule_id = sr.id
+                JOIN primitive_rules pr ON spr.primitive_rule_id = pr.id
+                ORDER BY sr.name, spr.order_index, spr.weight DESC
+            """
+            return db_manager.execute_query(query)
 
     def get_primitive_rules_for_semantic(self, semantic_rule_id: int) -> List[Dict[str, Any]]:
         """Get primitive rules related to a semantic rule."""
         query = """
-            SELECT pr.*, spr.weight, spr.order_index, spr.is_required
+            SELECT pr.*, 'primitive' as type, spr.weight, spr.order_index, spr.is_required
             FROM primitive_rules pr
             JOIN semantic_primitive_relations spr ON pr.id = spr.primitive_rule_id
             WHERE spr.semantic_rule_id = ?
@@ -399,7 +447,7 @@ class RelationCRUD:
     def get_semantic_rules_for_task(self, task_rule_id: int) -> List[Dict[str, Any]]:
         """Get semantic rules related to a task rule."""
         query = """
-            SELECT sr.*, tsr.weight, tsr.order_index, tsr.is_required, tsr.context_override
+            SELECT sr.*, 'semantic' as type, tsr.weight, tsr.order_index, tsr.is_required, tsr.context_override
             FROM semantic_rules sr
             JOIN task_semantic_relations tsr ON sr.id = tsr.semantic_rule_id
             WHERE tsr.task_rule_id = ?
@@ -408,25 +456,95 @@ class RelationCRUD:
 
         return db_manager.execute_query(query, (task_rule_id,))
 
-    def delete_semantic_primitive_relation(self, semantic_rule_id: int, primitive_rule_id: int) -> bool:
-        """Delete semantic-primitive relationship."""
-        query = """
-            DELETE FROM semantic_primitive_relations
-            WHERE semantic_rule_id = ? AND primitive_rule_id = ?
-        """
+    def get_rule_dependencies(self, rule_type: str, rule_id: int) -> Dict[str, List[Dict[str, Any]]]:
+        """Get all dependencies for a rule."""
+        dependencies = {"children": [], "parents": []}
+        
+        if rule_type == "task":
+            # Get semantic rules that this task depends on
+            dependencies["children"] = self.get_semantic_rules_for_task(rule_id)
+        elif rule_type == "semantic":
+            # Get primitive rules that this semantic rule depends on
+            dependencies["children"] = self.get_primitive_rules_for_semantic(rule_id)
+            
+            # Get task rules that depend on this semantic rule
+            query = """
+                SELECT tr.id, tr.name, 'task' as type, tsr.weight, tsr.order_index, tsr.is_required
+                FROM task_semantic_relations tsr
+                JOIN task_rules tr ON tsr.task_rule_id = tr.id
+                WHERE tsr.semantic_rule_id = ?
+                ORDER BY tsr.order_index, tsr.weight DESC
+            """
+            dependencies["parents"] = db_manager.execute_query(query, (rule_id,))
+        elif rule_type == "primitive":
+            # Get semantic rules that depend on this primitive rule
+            query = """
+                SELECT sr.id, sr.name, 'semantic' as type, spr.weight, spr.order_index, spr.is_required
+                FROM semantic_primitive_relations spr
+                JOIN semantic_rules sr ON spr.semantic_rule_id = sr.id
+                WHERE spr.primitive_rule_id = ?
+                ORDER BY spr.order_index, spr.weight DESC
+            """
+            dependencies["parents"] = db_manager.execute_query(query, (rule_id,))
+        
+        return dependencies
 
-        affected_rows = db_manager.execute_update(query, (semantic_rule_id, primitive_rule_id))
+    def update_relation_weight(self, relation_type: str, relation_id: int, weight: float) -> bool:
+        """Update the weight of a relationship."""
+        if relation_type == "task_semantic":
+            table = "task_semantic_relations"
+        elif relation_type == "semantic_primitive":
+            table = "semantic_primitive_relations"
+        else:
+            raise ValueError(f"Invalid relation type: {relation_type}")
+            
+        query = f"UPDATE {table} SET weight = ? WHERE id = ?"
+        affected_rows = db_manager.execute_update(query, (weight, relation_id))
+        return affected_rows > 0
+
+    def update_relation_order(self, relation_type: str, relation_id: int, order_index: int) -> bool:
+        """Update the order of a relationship."""
+        if relation_type == "task_semantic":
+            table = "task_semantic_relations"
+        elif relation_type == "semantic_primitive":
+            table = "semantic_primitive_relations"
+        else:
+            raise ValueError(f"Invalid relation type: {relation_type}")
+            
+        query = f"UPDATE {table} SET order_index = ? WHERE id = ?"
+        affected_rows = db_manager.execute_update(query, (order_index, relation_id))
         return affected_rows > 0
 
     def delete_task_semantic_relation(self, task_rule_id: int, semantic_rule_id: int) -> bool:
-        """Delete task-semantic relationship."""
-        query = """
-            DELETE FROM task_semantic_relations
-            WHERE task_rule_id = ? AND semantic_rule_id = ?
-        """
-
+        """Delete a task-semantic relationship."""
+        query = "DELETE FROM task_semantic_relations WHERE task_rule_id = ? AND semantic_rule_id = ?"
         affected_rows = db_manager.execute_update(query, (task_rule_id, semantic_rule_id))
         return affected_rows > 0
+
+    def delete_semantic_primitive_relation(self, semantic_rule_id: int, primitive_rule_id: int) -> bool:
+        """Delete a semantic-primitive relationship."""
+        query = "DELETE FROM semantic_primitive_relations WHERE semantic_rule_id = ? AND primitive_rule_id = ?"
+        affected_rows = db_manager.execute_update(query, (semantic_rule_id, primitive_rule_id))
+        return affected_rows > 0
+
+    def get_rule_hierarchy(self) -> Dict[str, Any]:
+        """Get the complete rule hierarchy."""
+        hierarchy = {
+            "task_rules": [],
+            "semantic_rules": [],
+            "primitive_rules": [],
+            "relationships": {
+                "task_semantic": self.get_task_semantic_relations(),
+                "semantic_primitive": self.get_semantic_primitive_relations()
+            }
+        }
+        
+        # Get all rules
+        hierarchy["task_rules"] = task_crud.get_all()
+        hierarchy["semantic_rules"] = semantic_crud.get_all()
+        hierarchy["primitive_rules"] = primitive_crud.get_all()
+        
+        return hierarchy
 
 
 class VersionCRUD:

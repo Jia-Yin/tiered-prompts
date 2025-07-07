@@ -233,6 +233,45 @@ class MCPClientService:
                     }
                 ],
                 "priority_score": 7.8
+            },
+            "create_primitive_rule": {
+                "success": True,
+                "rule_id": 999,
+                "message": "Rule created successfully (mock)"
+            },
+            "create_semantic_rule": {
+                "success": True,
+                "rule_id": 999,
+                "message": "Rule created successfully (mock)"
+            },
+            "create_task_rule": {
+                "success": True,
+                "rule_id": 999,
+                "message": "Rule created successfully (mock)"
+            },
+            "update_primitive_rule": {
+                "success": True,
+                "message": "Rule updated successfully (mock)"
+            },
+            "update_semantic_rule": {
+                "success": True,
+                "message": "Rule updated successfully (mock)"
+            },
+            "update_task_rule": {
+                "success": True,
+                "message": "Rule updated successfully (mock)"
+            },
+            "delete_primitive_rule": {
+                "success": True,
+                "message": "Rule deleted successfully (mock)"
+            },
+            "delete_semantic_rule": {
+                "success": True,
+                "message": "Rule deleted successfully (mock)"
+            },
+            "delete_task_rule": {
+                "success": True,
+                "message": "Rule deleted successfully (mock)"
             }
         }
         

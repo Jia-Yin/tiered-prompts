@@ -154,8 +154,9 @@ export interface CreateRuleRequest {
   domain?: string;
 }
 
-export interface UpdateRuleRequest extends Partial<CreateRuleRequest> {
-  id: number;
+export interface UpdateRuleRequest extends Partial<Omit<CreateRuleRequest, 'rule_type'>> {
+  // No id field needed as it's passed as URL parameter
+  // No rule_type field as it can't be changed during update
 }
 
 export interface GeneratePromptRequest {

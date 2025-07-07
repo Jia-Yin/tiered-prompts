@@ -130,7 +130,8 @@ export const listRules = async (params?: {
       return data.rules.map((rule: any) => ({
         ...rule,
         type: params.rule_type, // Ensure type is set correctly
-        id: rule.id // Keep original numeric ID
+        id: rule.id, // Keep original numeric ID
+        content: rule.content || rule.content_template || rule.prompt_template
       }));
     }
     
@@ -147,7 +148,8 @@ export const listRules = async (params?: {
                 allRules.push(...parsedRules.rules.map((rule: any) => ({ 
                   ...rule, 
                   type,
-                  id: rule.id // Keep original numeric ID
+                  id: rule.id, // Keep original numeric ID
+                  content: rule.content || rule.content_template || rule.prompt_template
                 })));
               }
             } catch (e) {
@@ -159,7 +161,8 @@ export const listRules = async (params?: {
             allRules.push(...typeData.rules.map((rule: any) => ({ 
               ...rule, 
               type,
-              id: rule.id // Keep original numeric ID
+              id: rule.id, // Keep original numeric ID
+              content: rule.content || rule.content_template || rule.prompt_template
             })));
           }
         }
@@ -169,7 +172,10 @@ export const listRules = async (params?: {
     
     // Case 3: Direct array
     if (Array.isArray(data)) {
-      return data;
+      return data.map(rule => ({
+        ...rule,
+        content: rule.content || rule.content_template || rule.prompt_template
+      }));
     }
   }
   
@@ -204,6 +210,11 @@ export const deleteRule = async (id: number): Promise<{
 export const getRule = async (id: number): Promise<Rule> => {
   const response = await api.get(`/rules/${id}`);
   return response.data.rule;
+};
+
+export const getRuleDependencies = async (ruleType: string, ruleId: number): Promise<any> => {
+  const response = await api.get(`/relationships/dependencies/${ruleType}/${ruleId}`);
+  return response.data;
 };
 
 // ============================================================================
