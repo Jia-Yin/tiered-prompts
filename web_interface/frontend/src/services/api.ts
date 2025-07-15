@@ -199,6 +199,14 @@ export const updateRule = async (id: number, request: Partial<UpdateRuleRequest>
   return response.data;
 };
 
+export const updateRuleByType = async (type: string, id: number, request: Partial<UpdateRuleRequest>): Promise<{
+  success: boolean;
+  message: string;
+}> => {
+  const response = await api.put(`/rules/${type}/${id}`, request);
+  return response.data;
+};
+
 export const deleteRule = async (id: number): Promise<{
   success: boolean;
   message: string;
@@ -209,6 +217,11 @@ export const deleteRule = async (id: number): Promise<{
 
 export const getRule = async (id: number): Promise<Rule> => {
   const response = await api.get(`/rules/${id}`);
+  return response.data.rule;
+};
+
+export const getRuleByType = async (type: string, id: number): Promise<Rule> => {
+  const response = await api.get(`/rules/${type}/${id}`);
   return response.data.rule;
 };
 

@@ -7,12 +7,12 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { createRule, updateRule, getRule } from '../services/api';
+import { createRule, updateRule, updateRuleByType, getRule, getRuleByType } from '../services/api';
 import { CreateRuleRequest, UpdateRuleRequest, Rule } from '../types';
 import { handleApiError } from '../services/api';
 
 const RuleEditor: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { type, id } = useParams<{ type: string; id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isEditing = id !== undefined && id !== 'new';
@@ -33,15 +33,26 @@ const RuleEditor: React.FC = () => {
 
   // Fetch existing rule if editing
   const { data: existingRule, isLoading } = useQuery(
-    ['rule', id],
-    () => getRule(parseInt(id!)),
+    ['rule', type, id],
+    () => type && id ? getRuleByType(type, parseInt(id)) : getRule(parseInt(id!)),
     {
       enabled: isEditing && !isNaN(parseInt(id!)),
       onSuccess: (rule: Rule) => {
+        
+        // Handle different content field names for different rule types
+        let content = '';
+        if (rule.type === 'primitive') {
+          content = rule.content || '';
+        } else if (rule.type === 'semantic') {
+          content = (rule as any).content_template || '';
+        } else if (rule.type === 'task') {
+          content = (rule as any).prompt_template || '';
+        }
+        
         setFormData({
           rule_type: rule.type,
           name: rule.name,
-          content: rule.content || '',
+          content: content,
           description: rule.description || '',
           category: rule.category || '',
           language: rule.language || '',
@@ -100,7 +111,12 @@ const RuleEditor: React.FC = () => {
           updateData.domain = formData.domain;
         }
 
-        await updateRule(parseInt(id!), updateData);
+        // Use the new type-aware update endpoint if we have the type
+        if (type) {
+          await updateRuleByType(type, parseInt(id!), updateData);
+        } else {
+          await updateRule(parseInt(id!), updateData);
+        }
       } else {
         await createRule(formData);
       }

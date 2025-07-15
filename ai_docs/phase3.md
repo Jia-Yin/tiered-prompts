@@ -35,7 +35,13 @@ def generate_prompt(
     context: dict = None,
     target_model: str = "claude"
 ) -> str:
-    """從規則階層生成完整提示"""
+    """從規則階層生成完整提示
+    
+    包含智能回退機制：
+    - 當任務規則模板缺少 {{semantic_rules}} 時自動追加
+    - 當語義規則模板缺少 {{primitive_rules}} 時自動追加
+    - 確保所有層級規則內容都包含在最終提示中
+    """
 ```
 
 #### T2: 規則分析工具

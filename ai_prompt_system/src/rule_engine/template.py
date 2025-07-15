@@ -73,27 +73,25 @@ class TemplateEngine:
 
         # Build semantic rules content dynamically
         semantic_rules_content = []
-        all_primitive_rules_content = []
 
         for semantic_data in resolved_hierarchy.get('semantic_rules', []):
             # Render this semantic rule with its primitive rules
             rendered_semantic = self._render_semantic_rule_with_primitives(semantic_data, merged_context)
             semantic_rules_content.append(rendered_semantic)
 
-            # Also collect all primitive rules for the task level
-            for primitive_rule in semantic_data.get('primitive_rules', []):
-                if primitive_rule.get('content'):
-                    rendered_primitive = self._render_primitive_rule(primitive_rule, merged_context)
-                    if rendered_primitive and rendered_primitive not in all_primitive_rules_content:
-                        all_primitive_rules_content.append(rendered_primitive)
-
         # Add dynamic content to context
         merged_context['semantic_rules'] = '\n\n---\n\n'.join(semantic_rules_content)
-        merged_context['primitive_rules'] = '\n\n'.join(all_primitive_rules_content)
 
         # Render final task template
         try:
-            return self.render_template(task_rule['prompt_template'], merged_context)
+            task_template = task_rule['prompt_template']
+            rendered_prompt = self.render_template(task_template, merged_context)
+            
+            # Check if semantic_rules placeholder was not found and append if needed
+            if not self._has_placeholder(task_template, 'semantic_rules') and semantic_rules_content:
+                rendered_prompt += '\n\n---\n\n' + merged_context['semantic_rules']
+            
+            return rendered_prompt
         except Exception as e:
             logger.error(f"Error rendering task rule {task_rule['id']}: {e}")
             raise
@@ -120,7 +118,14 @@ class TemplateEngine:
 
         # Render semantic template
         try:
-            return self.render_template(semantic_rule['content_template'], semantic_context)
+            semantic_template = semantic_rule['content_template']
+            rendered_semantic = self.render_template(semantic_template, semantic_context)
+            
+            # Check if primitive_rules placeholder was not found and append if needed
+            if not self._has_placeholder(semantic_template, 'primitive_rules') and primitive_rules_content:
+                rendered_semantic += '\n\n' + semantic_context['primitive_rules']
+            
+            return rendered_semantic
         except Exception as e:
             logger.error(f"Error rendering semantic rule {semantic_rule['id']}: {e}")
             return f"<!-- Error rendering semantic rule {semantic_rule['name']}: {e} -->"
@@ -136,6 +141,13 @@ class TemplateEngine:
         except Exception as e:
             logger.error(f"Error rendering primitive rule {primitive_rule['id']}: {e}")
             return primitive_rule['content']  # Return as-is if template fails
+
+    def _has_placeholder(self, template_str: str, placeholder_name: str) -> bool:
+        """Check if a placeholder exists in a template string."""
+        import re
+        # Check for {{placeholder_name}} patterns
+        pattern = r'\{\{\s*' + re.escape(placeholder_name) + r'\s*\}\}'
+        return bool(re.search(pattern, template_str))
 
     def validate_template(self, template_str: str) -> Dict[str, Any]:
         """

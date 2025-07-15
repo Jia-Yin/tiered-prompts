@@ -63,7 +63,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onUpdate, onRuleClick }) => {
       className="relative group cursor-pointer bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
     >
       <div className="absolute top-3 right-3 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-        {(rule.type === 'semantic' || rule.type === 'task') && (
+        {rule.type === 'task' && (
           <button
             onClick={handleGeneratePrompt}
             className="p-2 text-gray-500 hover:text-primary-600 bg-gray-100 hover:bg-primary-100 rounded-full shadow-sm border border-gray-200"
@@ -73,7 +73,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onUpdate, onRuleClick }) => {
           </button>
         )}
         <Link
-          to={`/rules/${rule.id}/edit`}
+          to={`/rules/${rule.type}/${rule.id}/edit`}
           onClick={(e) => e.stopPropagation()}
           className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full shadow-sm border border-gray-200"
           title="Edit Rule"

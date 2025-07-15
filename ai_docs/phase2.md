@@ -50,18 +50,35 @@ def merge_rule_content(self, rules: List[dict]) -> dict
 - **Jinja2 整合**: 支援複雜的模板語法
 - **變數替換**: 動態內容注入
 - **模型特定格式**: 針對不同 AI 模型的格式優化
+- **智能回退機制**: 當占位符不存在時自動追加子規則內容
 
 #### 主要方法
 ```python
 def render_template(self, template: str, context: dict) -> str
+def render_rule_hierarchy(self, resolved_hierarchy: dict, context: dict) -> str
 def extract_variables(self, template: str) -> List[str]
 def format_for_model(self, content: str, model: str) -> str
+def _has_placeholder(self, template: str, placeholder: str) -> bool
 ```
 
 #### 特色實現
 - **安全沙箱**: 防止惡意模板執行
 - **變數提取**: 自動識別模板中的變數
 - **模型適配**: 支援 Claude、GPT、Gemini 等模型格式
+- **智能回退**: 自動處理缺失的占位符，確保子規則內容不會丟失
+
+#### 占位符回退機制
+模板引擎現在包含智能回退機制，當模板中找不到預期的占位符時，會自動將子規則內容追加到末尾：
+
+**任務規則 (Task Rules)**:
+- 如果模板中沒有 `{{semantic_rules}}` 占位符，語義規則內容會自動追加到模板末尾
+- 追加格式：`\n\n---\n\n` + 語義規則內容
+
+**語義規則 (Semantic Rules)**:
+- 如果模板中沒有 `{{primitive_rules}}` 占位符，原始規則內容會自動追加到模板末尾
+- 追加格式：`\n\n` + 原始規則內容
+
+這確保了即使模板作者忘記包含適當的占位符，層級規則仍會包含在最終的提示生成中。
 
 ### 3. 驗證引擎 (ValidationEngine)
 

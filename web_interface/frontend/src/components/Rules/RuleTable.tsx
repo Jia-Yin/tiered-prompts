@@ -122,7 +122,7 @@ const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate, onRuleClick }) =
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
-                    {(rule.type === 'semantic' || rule.type === 'task') && (
+                    {rule.type === 'task' && (
                       <button
                         onClick={(e) => handleGeneratePrompt(e, rule)}
                         className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
@@ -132,7 +132,7 @@ const RuleTable: React.FC<RuleTableProps> = ({ rules, onUpdate, onRuleClick }) =
                       </button>
                     )}
                     <Link
-                      to={`/rules/${rule.id}/edit`}
+                      to={`/rules/${rule.type}/${rule.id}/edit`}
                       onClick={(e) => e.stopPropagation()}
                       className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                       title="Edit Rule"

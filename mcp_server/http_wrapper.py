@@ -750,15 +750,23 @@ async def http_get_rule_by_id(rule_id: int):
             ("task", task_crud_instance)
         ]
         
+        found_rules = []
         for rule_type, crud_instance in rule_types:
             if crud_instance:
                 try:
                     rule = crud_instance.get_by_id(rule_id)
                     if rule:
-                        return {"rule": {**rule, "type": rule_type}}
+                        found_rules.append((rule_type, rule))
                 except Exception as e:
                     logger.error(f"Error getting {rule_type} rule {rule_id}: {e}")
                     continue
+        
+        if len(found_rules) > 1:
+            logger.warning(f"Found duplicate rule IDs {rule_id} across multiple types: {[r[0] for r in found_rules]}")
+        
+        if found_rules:
+            rule_type, rule = found_rules[0]
+            return {"rule": {**rule, "type": rule_type}}
         
         raise HTTPException(status_code=404, detail="Rule not found")
         
@@ -766,6 +774,39 @@ async def http_get_rule_by_id(rule_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting rule {rule_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tools/get_rule/{rule_type}/{rule_id}")
+async def http_get_rule_by_type_and_id(rule_type: str, rule_id: int):
+    """Get a specific rule by type and ID via HTTP"""
+    try:
+        if not RULE_ENGINE_AVAILABLE:
+            return {"error": "Rule engine not available"}
+        
+        # Get the appropriate CRUD instance based on rule type
+        crud_instance = None
+        if rule_type == "primitive":
+            crud_instance = primitive_crud_instance
+        elif rule_type == "semantic":
+            crud_instance = semantic_crud_instance
+        elif rule_type == "task":
+            crud_instance = task_crud_instance
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid rule type: {rule_type}")
+        
+        if not crud_instance:
+            raise HTTPException(status_code=500, detail=f"CRUD instance not available for {rule_type} rules")
+        
+        rule = crud_instance.get_by_id(rule_id)
+        if not rule:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        
+        return {"rule": {**rule, "type": rule_type}}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting {rule_type} rule {rule_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================

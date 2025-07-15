@@ -38,7 +38,7 @@ function App() {
                 <Route path="/rules" element={<Rules />} />
                 <Route path="/rules/new" element={<RuleEditor />} />
                 
-                <Route path="/rules/:id/edit" element={<RuleEditor />} />
+                <Route path="/rules/:type/:id/edit" element={<RuleEditor />} />
                 <Route path="/playground" element={<Playground />} />
                 <Route path="/relationships" element={<Relationships />} />
                 <Route path="/analytics" element={<Analytics />} />

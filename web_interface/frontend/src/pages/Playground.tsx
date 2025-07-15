@@ -20,12 +20,12 @@ const Playground: React.FC = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState<PromptResult | null>(null);
   const [error, setError] = useState<string>('');
 
-  // Fetch rules (only semantic and task rules)
+  // Fetch rules (only task rules can generate prompts)
   const { data: rawRules, isLoading } = useQuery(
     ['rules'],
     () => listRules(),
     {
-      select: (rules) => rules.filter(rule => rule.type === 'semantic' || rule.type === 'task')
+      select: (rules) => rules.filter(rule => rule.type === 'task')
     }
   );
 
@@ -34,18 +34,12 @@ const Playground: React.FC = () => {
   // Handle pre-selected rule from navigation state
   useEffect(() => {
     const state = location.state as { selectedRule?: Rule };
-    if (state?.selectedRule && (state.selectedRule.type === 'semantic' || state.selectedRule.type === 'task')) {
+    if (state?.selectedRule && state.selectedRule.type === 'task') {
       setSelectedRule(state.selectedRule);
-      // Set default context based on rule type
-      if (state.selectedRule.type === 'semantic') {
-        const defaultContext = { "tone": "professional", "context": "code review", "audience": "developers" };
-        setContext(defaultContext);
-        setContextInput(JSON.stringify(defaultContext, null, 2));
-      } else if (state.selectedRule.type === 'task') {
-        const defaultContext = { "component": "UserProfile", "criteria": "performance and accessibility", "language": "TypeScript", "framework": "React" };
-        setContext(defaultContext);
-        setContextInput(JSON.stringify(defaultContext, null, 2));
-      }
+      // Set default context for task rules
+      const defaultContext = { "component": "UserProfile", "criteria": "performance and accessibility", "language": "TypeScript", "framework": "React" };
+      setContext(defaultContext);
+      setContextInput(JSON.stringify(defaultContext, null, 2));
     }
   }, [location.state]);
 

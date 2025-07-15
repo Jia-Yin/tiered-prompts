@@ -314,6 +314,30 @@ async def get_rule(
         logger.error(f"Error getting rule {rule_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/rules/{rule_type}/{rule_id}")
+async def get_rule_by_type(
+    rule_type: str,
+    rule_id: int,
+    mcp_client=Depends(get_mcp_client)
+):
+    """Get a specific rule by type and ID"""
+    try:
+        # Use the direct MCP endpoint for getting a single rule by type
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://localhost:8001/tools/get_rule/{rule_type}/{rule_id}", timeout=30.0)
+            response.raise_for_status()
+            return response.json()
+        
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        else:
+            logger.error(f"HTTP error getting rule {rule_type}/{rule_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting rule {rule_type}/{rule_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/rules/{rule_id}", response_model=RuleResponse)
 async def update_rule(
     rule_id: int,
@@ -415,6 +439,78 @@ async def update_rule(
         raise
     except Exception as e:
         logger.error(f"Error updating rule {rule_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/rules/{rule_type}/{rule_id}", response_model=RuleResponse)
+async def update_rule_by_type(
+    rule_type: str,
+    rule_id: int,
+    request: UpdateRuleRequest,
+    mcp_client=Depends(get_mcp_client),
+    ws_manager=Depends(get_websocket_manager)
+):
+    """Update an existing rule by type and ID"""
+    try:
+        # Determine which MCP tool to use based on rule type
+        tool_map = {
+            "primitive": "update_primitive_rule",
+            "semantic": "update_semantic_rule",
+            "task": "update_task_rule"
+        }
+        
+        tool_name = tool_map.get(rule_type)
+        if not tool_name:
+            raise ValueError(f"Invalid rule type: {rule_type}")
+        
+        # Prepare arguments for update
+        args = {"rule_id": rule_id}
+        
+        # Add non-None fields from request
+        if request.name is not None:
+            args["name"] = request.name
+        if request.description is not None:
+            args["description"] = request.description
+        if request.category is not None:
+            args["category"] = request.category
+        if request.content is not None:
+            if rule_type == "primitive":
+                args["content"] = request.content
+            elif rule_type == "semantic":
+                args["content_template"] = request.content
+            elif rule_type == "task":
+                args["prompt_template"] = request.content
+        
+        # Task-specific fields
+        if rule_type == "task":
+            if request.language is not None:
+                args["language"] = request.language
+            if request.framework is not None:
+                args["framework"] = request.framework
+            if request.domain is not None:
+                args["domain"] = request.domain
+        
+        result = await mcp_client.call_mcp_tool(tool_name, args)
+        
+        # Send WebSocket notification
+        try:
+            await ws_manager.broadcast({
+                "type": "rule_updated",
+                "rule_id": rule_id,
+                "rule_type": rule_type,
+                "message": f"Rule '{request.name or rule_id}' updated successfully"
+            })
+        except Exception as e:
+            logger.warning(f"Failed to send WebSocket notification: {e}")
+        
+        return RuleResponse(
+            success=True,
+            message="Rule updated successfully",
+            rule_id=rule_id,
+            data=result
+        )
+        
+    except Exception as e:
+        logger.error(f"Error updating {rule_type} rule {rule_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/rules/{rule_id}", response_model=RuleResponse)
